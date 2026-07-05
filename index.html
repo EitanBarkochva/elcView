@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>elcView — עוזר ביקורת לחשמלאי</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- ספריות חיצוניות (UMD, ללא build) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <h1>⚡ elcView</h1>
+    <nav class="tabs" id="mainTabs">
+      <button class="tab active" data-screen="projects">פרויקטים</button>
+      <button class="tab" data-screen="plan" disabled>שרטוט</button>
+      <button class="tab" data-screen="table" disabled>טבלה</button>
+      <button class="tab" data-screen="inspection" disabled>ביקורת</button>
+    </nav>
+    <span id="projectTitle" class="project-title"></span>
+  </header>
+
+  <main>
+    <!-- ============ מסך פרויקטים ============ -->
+    <section id="screen-projects" class="screen active">
+      <div class="panel">
+        <h2>פרויקט חדש</h2>
+        <form id="newProjectForm" class="new-project-form">
+          <input type="text" id="projectName" placeholder="שם הפרויקט (למשל: דירה 5)" required>
+          <label class="file-label">
+            בחר קובץ PDF של תכנית החשמל
+            <input type="file" id="pdfFile" accept="application/pdf" required>
+          </label>
+          <span id="pdfFileName" class="file-name"></span>
+          <button type="submit" class="btn primary">צור פרויקט וזהה שקעים</button>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>פרויקטים קיימים</h2>
+        <div id="projectList" class="project-list">
+          <p class="muted">טוען...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ מסך שרטוט ============ -->
+    <section id="screen-plan" class="screen">
+      <div class="plan-toolbar">
+        <div class="toolbar-group">
+          <button id="modePan" class="btn tool active" title="גרירת התצוגה">✋ תצוגה</button>
+          <button id="modeAddOutlet" class="btn tool" title="לחיצה על השרטוט מוסיפה שקע">➕ שקע</button>
+          <button id="modeAddRoom" class="btn tool" title="מתיחת מלבן מגדירה חדר">🏠 חדר</button>
+        </div>
+        <div class="toolbar-group">
+          <button id="zoomIn" class="btn">＋</button>
+          <button id="zoomOut" class="btn">－</button>
+          <button id="zoomFit" class="btn">התאם</button>
+        </div>
+        <div class="toolbar-group">
+          <button id="runOcr" class="btn">🔍 זהה שמות חדרים (OCR)</button>
+          <button id="confirmPlan" class="btn primary">✔ שמור ועבור לטבלה</button>
+        </div>
+        <span id="detectStatus" class="detect-status"></span>
+      </div>
+      <div class="plan-body">
+        <div id="planViewport" class="plan-viewport">
+          <div id="planWorld" class="plan-world">
+            <canvas id="planCanvas"></canvas>
+            <div id="planOverlay" class="plan-overlay"></div>
+          </div>
+        </div>
+        <aside id="editorPanel" class="editor-panel hidden">
+          <!-- נבנה דינמית: עריכת שקע או חדר נבחר -->
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ מסך טבלה ============ -->
+    <section id="screen-table" class="screen">
+      <div class="table-toolbar">
+        <button id="exportExcel" class="btn primary">📥 הורד לאקסל</button>
+        <button id="backToPlan" class="btn">חזרה לשרטוט</button>
+        <span id="tableStats" class="muted"></span>
+      </div>
+      <div id="summaryTable" class="summary-table-wrap"></div>
+    </section>
+
+    <!-- ============ מסך ביקורת (שלד לשלב ב') ============ -->
+    <section id="screen-inspection" class="screen">
+      <div class="panel">
+        <h2>ביקורת בשטח</h2>
+        <div class="inspection-controls">
+          <label>באיזה חדר אתה נמצא?
+            <select id="inspectionRoom"></select>
+          </label>
+          <button id="cameraToggle" class="btn primary">📷 פתח מצלמה</button>
+        </div>
+        <div class="camera-wrap">
+          <video id="cameraVideo" autoplay playsinline muted class="hidden"></video>
+          <div id="cameraPlaceholder" class="camera-placeholder">
+            המצלמה סגורה. זיהוי אוטומטי של קופסאות כתומות ומדידת מרחקים — יתווסף בשלב ב'.
+          </div>
+        </div>
+        <div id="inspectionChecklist" class="inspection-checklist"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

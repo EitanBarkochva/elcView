@@ -1,0 +1,238 @@
+/* ===== elcView — עיצוב RTL ===== */
+:root {
+  --primary: #1565c0;
+  --primary-dark: #0d47a1;
+  --accent: #ff8f00;      /* כתום — כמו קופסת החשמל */
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --border: #d7dde3;
+  --text: #1c2733;
+  --muted: #6b7a89;
+  --ok: #2e7d32;
+  --err: #c62828;
+  --pin-outlet: #1565c0;
+  --pin-tv: #6a1b9a;
+  --pin-com: #00838f;
+  --pin-other: #546e7a;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: "Segoe UI", "Arial Hebrew", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ----- כותרת וטאבים ----- */
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--primary-dark);
+  color: #fff;
+  flex-wrap: wrap;
+}
+.app-header h1 { font-size: 1.2rem; margin: 0; }
+.project-title { margin-inline-start: auto; opacity: .85; font-size: .9rem; }
+.tabs { display: flex; gap: 4px; }
+.tab {
+  border: none;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  padding: 8px 18px;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.tab.active { background: var(--bg); color: var(--text); font-weight: 600; }
+.tab:disabled { opacity: .4; cursor: not-allowed; }
+
+main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.screen { display: none; flex: 1; min-height: 0; flex-direction: column; padding: 12px; gap: 12px; }
+.screen.active { display: flex; }
+
+/* ----- פאנלים כלליים ----- */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  max-width: 860px;
+}
+.panel h2 { margin-top: 0; font-size: 1.05rem; }
+.muted { color: var(--muted); }
+.hidden { display: none !important; }
+
+.btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: .95rem;
+}
+.btn:hover { background: #eef3f8; }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn.primary:hover { background: var(--primary-dark); }
+.btn.danger { background: var(--err); border-color: var(--err); color: #fff; }
+.btn.tool.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ----- מסך פרויקטים ----- */
+.new-project-form { display: flex; flex-direction: column; gap: 12px; }
+.new-project-form input[type="text"] {
+  padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;
+}
+.file-label {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--muted);
+}
+.file-label input { display: none; }
+.file-name { font-size: .9rem; color: var(--ok); }
+.project-list { display: flex; flex-direction: column; gap: 8px; }
+.project-row {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px;
+}
+.project-row .name { font-weight: 600; flex: 1; cursor: pointer; }
+.project-row .date { color: var(--muted); font-size: .85rem; }
+
+/* ----- מסך שרטוט ----- */
+#screen-plan { padding: 8px; }
+.plan-toolbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 12px;
+}
+.toolbar-group { display: flex; gap: 4px; }
+.detect-status { font-size: .85rem; color: var(--muted); }
+
+.plan-body { flex: 1; display: flex; gap: 8px; min-height: 0; }
+.plan-viewport {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: #8a97a5;
+  border-radius: 10px;
+  touch-action: none;
+  cursor: grab;
+}
+.plan-viewport.adding { cursor: crosshair; }
+.plan-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.plan-world canvas { display: block; background: #fff; }
+.plan-overlay { position: absolute; inset: 0; }
+
+/* סיכת שקע על השרטוט */
+.pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 34px;
+  padding: 2px 6px;
+  border-radius: 12px;
+  background: var(--pin-outlet);
+  color: #fff;
+  font-size: 11px;
+  text-align: center;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.4);
+  user-select: none;
+  direction: ltr;
+}
+.pin.kind-TV { background: var(--pin-tv); }
+.pin.kind-תקשורת { background: var(--pin-com); }
+.pin.kind-אחר { background: var(--pin-other); }
+.pin.selected { outline: 3px solid var(--accent); z-index: 5; }
+.pin.done::after { content: " ✓"; }
+
+/* מלבן חדר */
+.room-rect {
+  position: absolute;
+  border: 2px solid rgba(21,101,192,.8);
+  background: rgba(21,101,192,.07);
+  border-radius: 4px;
+}
+.room-rect .room-name {
+  position: absolute; top: -1px; right: -1px;
+  background: rgba(21,101,192,.85); color: #fff;
+  padding: 1px 8px; font-size: 12px; border-radius: 0 4px 0 6px;
+  cursor: move; user-select: none;
+}
+.room-rect .room-resize {
+  position: absolute; bottom: -7px; left: -7px;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--primary); border: 2px solid #fff;
+  cursor: nesw-resize;
+}
+.room-rect.selected { border-color: var(--accent); }
+.room-rect.selected .room-name { background: var(--accent); }
+
+/* פאנל עריכה צדדי */
+.editor-panel {
+  width: 260px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  overflow-y: auto;
+}
+.editor-panel h3 { margin: 0 0 10px; font-size: 1rem; }
+.editor-panel label { display: block; font-size: .85rem; margin-bottom: 8px; color: var(--muted); }
+.editor-panel input, .editor-panel select {
+  width: 100%; padding: 7px; margin-top: 3px;
+  border: 1px solid var(--border); border-radius: 6px; font-size: .95rem;
+}
+.editor-panel .row-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+/* ----- מסך טבלה ----- */
+.table-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.summary-table-wrap { flex: 1; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+table.summary { width: 100%; border-collapse: collapse; font-size: .95rem; }
+table.summary th, table.summary td { border-bottom: 1px solid var(--border); padding: 8px 12px; text-align: right; }
+table.summary thead th { background: var(--primary); color: #fff; position: sticky; top: 0; }
+table.summary tr.room-header td {
+  background: #e3ecf5; font-weight: 700; font-size: 1rem;
+}
+table.summary td.ro { color: var(--text); }
+table.summary input[type="text"] {
+  width: 100%; border: 1px solid transparent; background: transparent;
+  padding: 4px; border-radius: 4px; font-size: .95rem;
+}
+table.summary input[type="text"]:focus { border-color: var(--primary); background: #fff; outline: none; }
+table.summary input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--ok); }
+tr.done-row td { background: #f0f8f1; }
+
+/* ----- מסך ביקורת ----- */
+.inspection-controls { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin-bottom: 12px; }
+.inspection-controls select { padding: 8px; border-radius: 8px; border: 1px solid var(--border); min-width: 160px; }
+.camera-wrap { position: relative; background: #000; border-radius: 10px; overflow: hidden; min-height: 260px; display: flex; align-items: center; justify-content: center; }
+.camera-wrap video { width: 100%; max-height: 60vh; }
+.camera-placeholder { color: #aaa; padding: 30px; text-align: center; }
+.inspection-checklist { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.check-item { display: flex; gap: 10px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; align-items: center; }
+.check-item .status { font-size: 1.1rem; }
+
+/* ----- טוסט ----- */
+.toast {
+  position: fixed; bottom: 20px; right: 50%; transform: translateX(50%);
+  background: var(--text); color: #fff; padding: 10px 22px;
+  border-radius: 24px; z-index: 100; box-shadow: 0 3px 12px rgba(0,0,0,.3);
+  transition: opacity .3s;
+}
+.toast.error { background: var(--err); }
+
+/* ----- מובייל ----- */
+@media (max-width: 700px) {
+  .plan-body { flex-direction: column; }
+  .editor-panel { width: 100%; max-height: 40vh; }
+  .app-header h1 { display: none; }
+  .tab { padding: 8px 10px; font-size: .9rem; }
+}
