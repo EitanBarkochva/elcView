@@ -4,8 +4,7 @@
 import { RENDER_SCALE } from '../config.js';
 
 const pdfjsLib = window.pdfjsLib;
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 
 export class PdfService {
   constructor() {
@@ -27,12 +26,34 @@ export class PdfService {
     return { width: vp.width, height: vp.height };
   }
 
-  /** מרנדר את העמוד לקנבס הנתון */
+  /**
+   * מרנדר את העמוד לקנבס הנתון. הרינדור נעשה לקנבס פנימי חדש בכל קריאה
+   * (ל-pdf.js יש נעילה פר-קנבס שנתקעת אם רינדור קודם נקטע), ורק בסיום
+   * התוצאה מועתקת לקנבס התצוגה.
+   */
   async renderTo(canvas) {
-    canvas.width = this.viewport.width;
-    canvas.height = this.viewport.height;
-    const ctx = canvas.getContext('2d');
-    await this.page.render({ canvasContext: ctx, viewport: this.viewport }).promise;
+    if (this._renderTask) {
+      try { this._renderTask.cancel(); await this._renderTask.promise; } catch { /* ביטול צפוי */ }
+      this._renderTask = null;
+    }
+    const off = document.createElement('canvas');
+    off.width = this.viewport.width;
+    off.height = this.viewport.height;
+    // intent:'print' — ציור בלי requestAnimationFrame, כדי שהרינדור לא
+    // ייתקע כשהטאב ברקע (למשל כשעוברים לאפליקציה אחרת בטלפון)
+    this._renderTask = this.page.render({
+      canvasContext: off.getContext('2d'),
+      viewport: this.viewport,
+      intent: 'print',
+    });
+    try {
+      await this._renderTask.promise;
+    } finally {
+      this._renderTask = null;
+    }
+    canvas.width = off.width;
+    canvas.height = off.height;
+    canvas.getContext('2d').drawImage(off, 0, 0);
   }
 
   /**

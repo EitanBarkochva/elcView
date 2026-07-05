@@ -49,13 +49,25 @@ class App {
       this.updateTableStats();
     });
 
-    this.inspectionView = new InspectionView({
-      roomSelect: $('inspectionRoom'),
-      video: $('cameraVideo'),
-      placeholder: $('cameraPlaceholder'),
-      toggleBtn: $('cameraToggle'),
-      checklist: $('inspectionChecklist'),
-    });
+    this.inspectionView = new InspectionView(
+      {
+        roomSelect: $('inspectionRoom'),
+        video: $('cameraVideo'),
+        overlay: $('cameraOverlay'),
+        placeholder: $('cameraPlaceholder'),
+        toggleBtn: $('cameraToggle'),
+        autoToggle: $('autoModeToggle'),
+        toleranceWrap: $('toleranceWrap'),
+        toleranceInput: $('toleranceInput'),
+        measurePanel: $('measurePanel'),
+        checklist: $('inspectionChecklist'),
+      },
+      (outlet, patch) => {
+        this.repo.updateOutlet(outlet.id, patch)
+          .catch((e) => this.toast('שגיאה בשמירת המדידה: ' + e.message, true));
+        this.viewer.refreshOutlet(outlet);
+      },
+    );
 
     this.#bindUi();
     this.refreshProjectList();

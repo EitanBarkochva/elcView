@@ -39,6 +39,7 @@ export class TableView {
         <th>גובה מהרצפה (ס"מ)</th>
         <th>מרחק מפינה (ס"מ)</th>
         <th>מעגל</th>
+        <th>נמדד בשטח</th>
         <th>בוצע</th>
         <th>הערות</th>
       </tr></thead>`;
@@ -47,7 +48,7 @@ export class TableView {
     for (const [name, group] of sortedGroups) {
       const header = document.createElement('tr');
       header.className = 'room-header';
-      header.innerHTML = `<td colspan="6">🏠 ${name} — ${group.length} נקודות</td>`;
+      header.innerHTML = `<td colspan="7">🏠 ${name} — ${group.length} נקודות</td>`;
       tbody.appendChild(header);
 
       group.sort((a, b) => (a.heightCm ?? 0) - (b.heightCm ?? 0));
@@ -64,11 +65,16 @@ export class TableView {
     tr.classList.toggle('done-row', outlet.done);
 
     // עמודות קריאה בלבד
+    const measured = outlet.measuredHeightCm != null
+      ? `${outlet.measureStatus === 'ok' ? '✓' : outlet.measureStatus === 'mismatch' ? '✗' : ''} ` +
+        `${outlet.measuredHeightCm}${outlet.measuredCornerCm != null ? ` / ${outlet.measuredCornerCm}` : ''}`
+      : '—';
     for (const val of [
       outlet.kind,
       outlet.heightCm ?? '—',
       outlet.cornerDistanceCm ?? '—',
       outlet.circuit ?? '—',
+      measured,
     ]) {
       const td = document.createElement('td');
       td.className = 'ro';

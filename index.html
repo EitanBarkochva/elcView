@@ -6,7 +6,7 @@
   <title>elcView — עוזר ביקורת לחשמלאי</title>
   <link rel="stylesheet" href="css/style.css">
   <!-- ספריות חיצוניות (UMD, ללא build) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="libs/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
@@ -97,13 +97,20 @@
             <select id="inspectionRoom"></select>
           </label>
           <button id="cameraToggle" class="btn primary">📷 פתח מצלמה</button>
+          <button id="autoModeToggle" class="btn hidden">▶ סריקה אוטומטית</button>
+          <label class="hidden" id="toleranceWrap">סטייה מותרת (ס"מ)
+            <input type="number" id="toleranceInput" value="5" min="1" max="30" style="width:70px">
+          </label>
         </div>
-        <div class="camera-wrap">
+        <div class="camera-wrap" id="cameraWrap">
           <video id="cameraVideo" autoplay playsinline muted class="hidden"></video>
+          <canvas id="cameraOverlay" class="camera-overlay hidden"></canvas>
           <div id="cameraPlaceholder" class="camera-placeholder">
-            המצלמה סגורה. זיהוי אוטומטי של קופסאות כתומות ומדידת מרחקים — יתווסף בשלב ב'.
+            המצלמה סגורה. פתח אותה, כוון אל קופסה כתומה בקיר —
+            והקש עליה כדי לקבל גובה מהרצפה ומרחק מפינת הקיר.
           </div>
         </div>
+        <div id="measurePanel" class="measure-panel hidden"></div>
         <div id="inspectionChecklist" class="inspection-checklist"></div>
       </div>
     </section>

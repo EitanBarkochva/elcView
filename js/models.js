@@ -51,6 +51,7 @@ export class Outlet {
     id = uuid(), project_id = null, room_id = null, kind = 'שקע',
     height_cm = null, corner_distance_cm = null, x = 0, y = 0,
     circuit = null, done = false, notes = '',
+    measured_height_cm = null, measured_corner_cm = null, measure_status = null,
   } = {}) {
     this.id = id;
     this.projectId = project_id;
@@ -63,6 +64,10 @@ export class Outlet {
     this.circuit = circuit;
     this.done = done;
     this.notes = notes;
+    // תוצאות מדידה מהביקורת בשטח (שלבים ב'-ד')
+    this.measuredHeightCm = measured_height_cm;
+    this.measuredCornerCm = measured_corner_cm;
+    this.measureStatus = measure_status; // 'ok' | 'mismatch' | null
   }
 
   toRow() {
@@ -78,6 +83,9 @@ export class Outlet {
       circuit: this.circuit,
       done: this.done,
       notes: this.notes,
+      measured_height_cm: this.measuredHeightCm,
+      measured_corner_cm: this.measuredCornerCm,
+      measure_status: this.measureStatus,
     };
   }
 

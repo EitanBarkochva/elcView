@@ -28,14 +28,17 @@ export class ExcelExporter {
       'גובה מהרצפה (ס"מ)': o.heightCm ?? '',
       'מרחק מפינה (ס"מ)': o.cornerDistanceCm ?? '',
       'מעגל': o.circuit ?? '',
+      'גובה נמדד (ס"מ)': o.measuredHeightCm ?? '',
+      'מרחק נמדד (ס"מ)': o.measuredCornerCm ?? '',
+      'תואם שרטוט': o.measureStatus === 'ok' ? '✓' : o.measureStatus === 'mismatch' ? '✗' : '',
       'בוצע': o.done ? '✓' : '✗',
       'הערות': o.notes || '',
     }));
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 14 }, { wch: 10 }, { wch: 16 }, { wch: 16 },
-      { wch: 8 }, { wch: 7 }, { wch: 40 },
+      { wch: 14 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 8 },
+      { wch: 14 }, { wch: 14 }, { wch: 11 }, { wch: 7 }, { wch: 40 },
     ];
 
     const wb = XLSX.utils.book_new();
