@@ -1,5 +1,8 @@
-// ===== טבלת הסיכום — מקובצת לפי חדר =====
+// ===== טבלת הסיכום =====
+// מבנה העמודות (לפי בקשת המשתמש): שם חדר | כמות שקעים | גובה מהרצפה |
+// מרחק מקיר סמוך (קו המידה בשרטוט) | נמדד בשטח | בוצע | הערות.
 // עריכה מותרת רק בעמודות "בוצע" ו"הערות"; שאר העמודות לקריאה בלבד.
+// תא שם החדר ממוזג (rowspan) לכל נקודות החדר.
 
 export class TableView {
   /**
@@ -35,11 +38,10 @@ export class TableView {
     table.className = 'summary';
     table.innerHTML = `
       <thead><tr>
-        <th>סוג נקודה</th>
-        <th>כמות</th>
+        <th>חדר</th>
+        <th>כמות שקעים</th>
         <th>גובה מהרצפה (ס"מ)</th>
-        <th>מרחק מפינה (ס"מ)</th>
-        <th>מעגל</th>
+        <th>מרחק מקיר סמוך (ס"מ)</th>
         <th>נמדד בשטח</th>
         <th>בוצע</th>
         <th>הערות</th>
@@ -47,14 +49,22 @@ export class TableView {
     const tbody = document.createElement('tbody');
 
     for (const [name, group] of sortedGroups) {
-      const header = document.createElement('tr');
-      header.className = 'room-header';
-      const totalSockets = group.reduce((s, o) => s + (o.quantity || 1), 0);
-      header.innerHTML = `<td colspan="8">🏠 ${name} — ${group.length} נקודות (${totalSockets} שקעים)</td>`;
-      tbody.appendChild(header);
-
       group.sort((a, b) => (a.heightCm ?? 0) - (b.heightCm ?? 0));
-      for (const o of group) tbody.appendChild(this.#row(o));
+      const totalSockets = group.reduce((s, o) => s + (o.quantity || 1), 0);
+
+      group.forEach((o, idx) => {
+        const tr = this.#row(o);
+        if (idx === 0) {
+          // תא החדר ממוזג על כל שורות החדר
+          const tdRoom = document.createElement('td');
+          tdRoom.className = 'room-cell';
+          tdRoom.rowSpan = group.length;
+          tdRoom.innerHTML = `<b>${name}</b><br>
+            <span class="muted small">${group.length} נקודות · ${totalSockets} שקעים</span>`;
+          tr.prepend(tdRoom);
+        }
+        tbody.appendChild(tr);
+      });
     }
 
     table.appendChild(tbody);
@@ -66,18 +76,20 @@ export class TableView {
     const tr = document.createElement('tr');
     tr.classList.toggle('done-row', outlet.done);
 
-    // עמודות קריאה בלבד
+    const qty = outlet.quantity || 1;
+    const qtyText = `${qty} × ${outlet.kind}` +
+      ({ 2: ' (כפול)', 3: ' (משולש)', 4: ' (רביעייה)' }[qty] || '');
+
     const measured = outlet.measuredHeightCm != null
       ? `${outlet.measureStatus === 'ok' ? '✓' : outlet.measureStatus === 'mismatch' ? '✗' : ''} ` +
         `${outlet.measuredHeightCm}${outlet.measuredCornerCm != null ? ` / ${outlet.measuredCornerCm}` : ''}`
       : '—';
-    const qtyText = { 1: '1', 2: '2 (כפול)', 3: '3 (משולש)', 4: '4 (רביעייה)' }[outlet.quantity] || outlet.quantity;
+
+    // עמודות קריאה בלבד
     for (const val of [
-      outlet.kind,
       qtyText,
       outlet.heightCm ?? '—',
       outlet.cornerDistanceCm ?? '—',
-      outlet.circuit ?? '—',
       measured,
     ]) {
       const td = document.createElement('td');

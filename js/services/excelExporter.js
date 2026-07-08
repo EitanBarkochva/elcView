@@ -24,10 +24,10 @@ export class ExcelExporter {
 
     const rows = sorted.map((o) => ({
       'חדר': roomName(o.roomId),
-      'סוג נקודה': o.kind,
       'כמות שקעים': o.quantity ?? 1,
+      'סוג נקודה': o.kind,
       'גובה מהרצפה (ס"מ)': o.heightCm ?? '',
-      'מרחק מפינה (ס"מ)': o.cornerDistanceCm ?? '',
+      'מרחק מקיר סמוך (ס"מ)': o.cornerDistanceCm ?? '',
       'מעגל': o.circuit ?? '',
       'גובה נמדד (ס"מ)': o.measuredHeightCm ?? '',
       'מרחק נמדד (ס"מ)': o.measuredCornerCm ?? '',
@@ -38,7 +38,7 @@ export class ExcelExporter {
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 14 }, { wch: 10 }, { wch: 11 }, { wch: 16 }, { wch: 16 }, { wch: 8 },
+      { wch: 14 }, { wch: 11 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 8 },
       { wch: 14 }, { wch: 14 }, { wch: 11 }, { wch: 7 }, { wch: 40 },
     ];
 

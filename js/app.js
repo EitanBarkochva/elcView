@@ -300,7 +300,7 @@ class App {
       this.viewer.refreshOutlet(outlet);
     });
 
-    const dist = this.#labeled(panel, 'מרחק מפינת הקיר (ס"מ)', 'input');
+    const dist = this.#labeled(panel, 'מרחק מקיר סמוך (ס"מ) — קו המידה בשרטוט', 'input');
     dist.type = 'number';
     dist.value = outlet.cornerDistanceCm ?? '';
     dist.addEventListener('input', () => {
