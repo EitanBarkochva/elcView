@@ -94,6 +94,48 @@ export class PlanDetector {
     return rooms;
   }
 
+  /**
+   * מציע מרחק-מקיר לכל נקודה מתוך מספרי המידות שזוהו ב-OCR.
+   * שיוך חמדני: הזוג (נקודה, מספר) הקרוב ביותר משויך ראשון, וכל מספר
+   * משמש נקודה אחת בלבד. מרחק חיפוש מקסימלי: maxDist נקודות עמוד.
+   * ממלא רק נקודות שאין להן ערך, ומחזיר את מספר ההצעות שמולאו.
+   */
+  suggestDistances(numberWords, outlets) {
+    // מספרי מידה אמיתיים הם כמעט תמיד כפולות של 5 (30, 45, 100, 180...).
+    // זה מסנן זיהויי-שווא של מספרי מעגלים ("2/1" שנקרא כ-"21").
+    const candidates = numberWords.filter((n) => n.value % 5 === 0);
+    const ALIGN_TOL = 14; // סטייה מותרת מקו השקע (נקודות עמוד)
+    const pairs = [];
+    for (const o of outlets) {
+      if (o.cornerDistanceCm != null) continue;
+      for (const n of candidates) {
+        const dx = Math.abs(o.x - n.x);
+        const dy = Math.abs(o.y - n.y);
+        // תווית המידה יושבת על קו המידה — כלומר באותה שורה או עמודה
+        // כמו השקע (הקו יוצא מהקיר אל השקע לאורך ציר אחד).
+        if (Math.min(dx, dy) > ALIGN_TOL) continue;
+        const d = Math.hypot(dx, dy);
+        // התווית באמצע הקו, ולכן המרחק אליה גדל עם ערך המידה
+        // (בקנה מידה 1:50, מידה של V ס"מ ⇒ התווית עד ~0.3V+25 נק' מהשקע)
+        if (d > 25 + n.value * 0.45) continue;
+        pairs.push({ o, n, d });
+      }
+    }
+    pairs.sort((a, b) => a.d - b.d);
+
+    const usedOutlets = new Set();
+    const usedNumbers = new Set();
+    let filled = 0;
+    for (const { o, n } of pairs) {
+      if (usedOutlets.has(o.id) || usedNumbers.has(n)) continue;
+      o.cornerDistanceCm = n.value;
+      usedOutlets.add(o.id);
+      usedNumbers.add(n);
+      filled++;
+    }
+    return filled;
+  }
+
   /** משייך כל שקע לחדר שמכיל אותו גיאומטרית (או null) */
   assignOutletsToRooms(outlets, rooms) {
     for (const o of outlets) {

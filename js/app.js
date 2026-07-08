@@ -210,6 +210,7 @@ class App {
     const btn = $('runOcr');
     btn.disabled = true;
     try {
+      // מעבר 1: שמות חדרים (עברית)
       this.setStatus('מריץ OCR לזיהוי שמות חדרים... 0%');
       const words = await this.ocr.recognizeRoomNames($('planCanvas'), (p) => {
         this.setStatus(`מריץ OCR לזיהוי שמות חדרים... ${Math.round(p * 100)}%`);
@@ -226,8 +227,19 @@ class App {
         if (!overlap) { this.rooms.push(s); added++; }
       }
       this.reassignRooms();
+
+      // מעבר 2: מספרי קווי המידה (ספרות) ⇒ הצעת מרחק מקיר סמוך
+      this.setStatus('מריץ OCR לזיהוי מרחקים... 0%');
+      const numbers = await this.ocr.recognizeNumbers($('planCanvas'), (p) => {
+        this.setStatus(`מריץ OCR לזיהוי מרחקים... ${Math.round(p * 100)}%`);
+      });
+      const filled = this.detector.suggestDistances(numbers, this.outlets);
+
       this.viewer.renderAll();
-      this.setStatus(`OCR זיהה ${added} חדרים חדשים. גרור ומתח את המלבנים לגבולות האמיתיים.`);
+      this.setStatus(
+        `OCR: ${added} חדרים חדשים, ${filled} הצעות מרחק. ` +
+        'גרור ומתח את מלבני החדרים ובדוק את המרחקים שהוצעו.',
+      );
     } catch (e) {
       this.setStatus('שגיאת OCR: ' + e.message);
     } finally {
