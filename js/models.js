@@ -50,7 +50,7 @@ export class Outlet {
   constructor({
     id = uuid(), project_id = null, room_id = null, kind = 'שקע',
     height_cm = null, corner_distance_cm = null, x = 0, y = 0,
-    circuit = null, done = false, notes = '',
+    circuit = null, done = false, notes = '', quantity = 1,
     measured_height_cm = null, measured_corner_cm = null, measure_status = null,
   } = {}) {
     this.id = id;
@@ -64,6 +64,7 @@ export class Outlet {
     this.circuit = circuit;
     this.done = done;
     this.notes = notes;
+    this.quantity = quantity; // 1=בודד, 2=כפול, 4=רביעייה
     // תוצאות מדידה מהביקורת בשטח (שלבים ב'-ד')
     this.measuredHeightCm = measured_height_cm;
     this.measuredCornerCm = measured_corner_cm;
@@ -83,6 +84,7 @@ export class Outlet {
       circuit: this.circuit,
       done: this.done,
       notes: this.notes,
+      quantity: this.quantity,
       measured_height_cm: this.measuredHeightCm,
       measured_corner_cm: this.measuredCornerCm,
       measure_status: this.measureStatus,

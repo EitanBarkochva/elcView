@@ -451,7 +451,7 @@ export class InspectionView {
         : '';
       div.innerHTML = `
         <span class="status">${icon}</span>
-        <span>${o.kind}</span>
+        <span>${o.kind}${o.quantity > 1 ? ` ×${o.quantity}` : ''}</span>
         <span class="muted">מתוכנן: גובה ${o.heightCm ?? '?'} ס"מ, פינה ${o.cornerDistanceCm ?? '?'} ס"מ${measured}</span>`;
       wrap.appendChild(div);
     }

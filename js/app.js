@@ -270,6 +270,28 @@ class App {
       this.viewer.refreshOutlet(outlet);
     });
 
+    // כמות שקעים בנקודה: בודד / כפול / משולש / רביעייה
+    const qtyLabel = document.createElement('label');
+    qtyLabel.textContent = 'כמות שקעים בנקודה';
+    const qtyRow = document.createElement('div');
+    qtyRow.className = 'qty-row';
+    const qtyBtns = [];
+    for (const q of [1, 2, 3, 4]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn qty' + (outlet.quantity === q ? ' tap-active' : '');
+      b.textContent = q;
+      b.addEventListener('click', () => {
+        outlet.quantity = q;
+        for (const other of qtyBtns) other.classList.toggle('tap-active', other === b);
+        this.viewer.refreshOutlet(outlet);
+      });
+      qtyBtns.push(b);
+      qtyRow.appendChild(b);
+    }
+    qtyLabel.appendChild(qtyRow);
+    panel.appendChild(qtyLabel);
+
     const height = this.#labeled(panel, 'גובה מהרצפה (ס"מ)', 'input');
     height.type = 'number';
     height.value = outlet.heightCm ?? '';

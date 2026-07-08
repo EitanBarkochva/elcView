@@ -36,6 +36,7 @@ export class TableView {
     table.innerHTML = `
       <thead><tr>
         <th>סוג נקודה</th>
+        <th>כמות</th>
         <th>גובה מהרצפה (ס"מ)</th>
         <th>מרחק מפינה (ס"מ)</th>
         <th>מעגל</th>
@@ -48,7 +49,8 @@ export class TableView {
     for (const [name, group] of sortedGroups) {
       const header = document.createElement('tr');
       header.className = 'room-header';
-      header.innerHTML = `<td colspan="7">🏠 ${name} — ${group.length} נקודות</td>`;
+      const totalSockets = group.reduce((s, o) => s + (o.quantity || 1), 0);
+      header.innerHTML = `<td colspan="8">🏠 ${name} — ${group.length} נקודות (${totalSockets} שקעים)</td>`;
       tbody.appendChild(header);
 
       group.sort((a, b) => (a.heightCm ?? 0) - (b.heightCm ?? 0));
@@ -69,8 +71,10 @@ export class TableView {
       ? `${outlet.measureStatus === 'ok' ? '✓' : outlet.measureStatus === 'mismatch' ? '✗' : ''} ` +
         `${outlet.measuredHeightCm}${outlet.measuredCornerCm != null ? ` / ${outlet.measuredCornerCm}` : ''}`
       : '—';
+    const qtyText = { 1: '1', 2: '2 (כפול)', 3: '3 (משולש)', 4: '4 (רביעייה)' }[outlet.quantity] || outlet.quantity;
     for (const val of [
       outlet.kind,
+      qtyText,
       outlet.heightCm ?? '—',
       outlet.cornerDistanceCm ?? '—',
       outlet.circuit ?? '—',

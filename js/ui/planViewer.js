@@ -124,7 +124,8 @@ export class PlanViewer {
     if (this.selected?.type === 'outlet' && this.selected.id === outlet.id) {
       el.classList.add('selected');
     }
-    el.textContent = outlet.heightCm != null ? `H=${outlet.heightCm}` : outlet.kind;
+    const base = outlet.heightCm != null ? `H=${outlet.heightCm}` : outlet.kind;
+    el.textContent = outlet.quantity > 1 ? `${base} ×${outlet.quantity}` : base;
     const px = outlet.x * RENDER_SCALE;
     const py = outlet.y * RENDER_SCALE;
     el.style.left = `${px}px`;
