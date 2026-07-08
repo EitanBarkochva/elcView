@@ -57,20 +57,45 @@ export class PdfService {
   }
 
   /**
-   * מחלץ את כל פריטי הטקסט עם מיקומם בקואורדינטות עמוד (נקודות PDF,
-   * ראשית למעלה-שמאל כמו בקנבס): [{text, x, y}]
+   * מחלץ את כל פריטי הטקסט וההערות (annotations) עם מיקומם בקואורדינטות
+   * עמוד (נקודות PDF, ראשית למעלה-שמאל כמו בקנבס):
+   * [{text, x, y, w?, h?, source: 'text'|'annot'|'freetext'}]
+   *
+   * ההערות חשובות במיוחד: ייצוא מאוטוקאד מטמיע את כל טקסט ה-SHX של
+   * השרטוט (שמות חדרים, מידות, מעגלים) כהערות, וגם המשתמש יכול להוסיף
+   * שמות חדרים כהערות טקסט (FreeText) בכל עורך PDF.
    */
   async extractTextItems() {
     const content = await this.page.getTextContent();
     const pageHeight = this.pageSize.height;
-    return content.items
+    const items = content.items
       .filter((it) => it.str && it.str.trim())
       .map((it) => ({
         text: it.str.trim(),
         // transform[4],[5] = מיקום בקואורדינטות PDF (ראשית למטה-שמאל)
         x: it.transform[4],
         y: pageHeight - it.transform[5], // היפוך ציר Y לקואורדינטות מסך
+        source: 'text',
       }));
+
+    const annots = await this.page.getAnnotations();
+    for (const a of annots) {
+      const text = (a.contentsObj?.str ?? a.contents ?? '').trim();
+      if (!text || !a.rect) continue;
+      // rect במרחב ה-user של ה-PDF — ההמרה דרך ה-viewport מטפלת גם
+      // בעמודים מסובבים, ואז מנרמלים חזרה לקואורדינטות עמוד
+      const [vx0, vy0] = this.viewport.convertToViewportPoint(a.rect[0], a.rect[1]);
+      const [vx1, vy1] = this.viewport.convertToViewportPoint(a.rect[2], a.rect[3]);
+      items.push({
+        text,
+        x: (vx0 + vx1) / 2 / RENDER_SCALE,
+        y: (vy0 + vy1) / 2 / RENDER_SCALE,
+        w: Math.abs(vx1 - vx0) / RENDER_SCALE,
+        h: Math.abs(vy1 - vy0) / RENDER_SCALE,
+        source: a.subtype === 'FreeText' ? 'freetext' : 'annot',
+      });
+    }
+    return items;
   }
 
   /** המרה מקואורדינטות עמוד לפיקסלים של קנבס הרינדור */

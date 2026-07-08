@@ -131,13 +131,20 @@ class App {
     const buf = await file.arrayBuffer();
     await this.#loadPlan(buf);
 
-    // זיהוי אוטומטי משכבת הטקסט
-    this.setStatus('מזהה שקעים משכבת הטקסט...');
+    // זיהוי אוטומטי משכבת הטקסט ומההערות המוטמעות ב-PDF
+    this.setStatus('מזהה שקעים, חדרים ומרחקים...');
     const textItems = await this.pdf.extractTextItems();
     this.outlets = this.detector.detectOutlets(textItems, this.project.id);
-    this.rooms = [];
+    this.rooms = this.detector.detectRoomsFromItems(textItems, this.project.id, this.pdf.pageSize);
+    const dists = this.detector.suggestDistancesFromItems(textItems, this.outlets);
+    this.reassignRooms();
     this.viewer.setData(this.rooms, this.outlets);
-    this.setStatus(`זוהו ${this.outlets.length} נקודות. הרץ OCR לזיהוי חדרים או סמן ידנית.`);
+    this.setStatus(
+      `זוהו ${this.outlets.length} נקודות, ${this.rooms.length} חדרים, ${dists} מרחקים. ` +
+      (this.rooms.length
+        ? 'גרור ומתח את מלבני החדרים לגבולות האמיתיים.'
+        : 'הרץ OCR לזיהוי חדרים או סמן ידנית.'),
+    );
 
     this.#enableProjectTabs();
     this.showScreen('plan');
@@ -154,9 +161,13 @@ class App {
       this.outlets = await this.repo.loadOutlets(project.id);
       const hasSavedData = this.outlets.length > 0;
       if (!hasSavedData) {
-        // פרויקט שטרם אושר — מריצים זיהוי מחדש משכבת הטקסט
+        // פרויקט שטרם אושר — מריצים זיהוי מחדש מהטקסט ומההערות
         const textItems = await this.pdf.extractTextItems();
         this.outlets = this.detector.detectOutlets(textItems, project.id);
+        if (!this.rooms.length) {
+          this.rooms = this.detector.detectRoomsFromItems(textItems, project.id, this.pdf.pageSize);
+        }
+        this.detector.suggestDistancesFromItems(textItems, this.outlets);
         this.detector.assignOutletsToRooms(this.outlets, this.rooms);
       }
       this.viewer.setData(this.rooms, this.outlets);
