@@ -38,6 +38,7 @@ class App {
         onSelectRoom: (r) => this.showRoomEditor(r),
         onAddOutlet: (x, y) => this.addOutlet(x, y),
         onAddRoom: (bounds) => this.addRoom(bounds),
+        onNameRoomAt: (x, y, clientX, clientY) => this.nameRoomAt(x, y, clientX, clientY),
         onGeometryChanged: () => this.reassignRooms(),
       },
     );
@@ -209,8 +210,93 @@ class App {
     this.reassignRooms();
     this.viewer.renderAll();
     this.viewer.select('room', room.id);
-    this.viewer.setMode('pan');
-    this.#setToolButtons('modePan');
+    // מיד אחרי מתיחת המלבן — שואלים מה שם החדר
+    const cx = bounds.x + bounds.w / 2;
+    const cy = bounds.y + bounds.h / 2;
+    this.openRoomNamePopup(room, cx, cy);
+  }
+
+  /**
+   * מצב "שם חדר": הקשה על השרטוט פותחת חלונית לכתיבת שם החדר —
+   * עריכת החדרים בתוך התוכנה בלי צורך בעורך PDF חיצוני.
+   * אם ההקשה בתוך חדר קיים — עורכים את שמו; אחרת נוצר חדר חדש סביב הנקודה.
+   */
+  nameRoomAt(x, y, clientX, clientY) {
+    const existing = this.rooms.find((r) => r.contains(x, y));
+    if (existing) {
+      this.openRoomNamePopup(existing, x, y, clientX, clientY);
+      return;
+    }
+    const w = Math.min(150, this.pdf.pageSize.width / 6);
+    const h = Math.min(110, this.pdf.pageSize.height / 6);
+    const room = new Room({
+      project_id: this.project.id,
+      bounds: { x: Math.max(0, x - w / 2), y: Math.max(0, y - h / 2), w, h },
+    });
+    this.rooms.push(room);
+    this.reassignRooms();
+    this.viewer.renderAll();
+    this.viewer.select('room', room.id);
+    this.openRoomNamePopup(room, x, y, clientX, clientY, true);
+  }
+
+  /**
+   * חלונית בחירת שם חדר: כפתורי שמות נפוצים + שדה חופשי.
+   * @param {Room} room החדר לעדכון
+   * @param {boolean} isNew חדר שנוצר עכשיו — ביטול ימחק אותו
+   */
+  openRoomNamePopup(room, pageX, pageY, clientX = null, clientY = null, isNew = false) {
+    const popup = $('roomNamePopup');
+    popup.classList.remove('hidden');
+
+    // מיקום ליד ההקשה, מוצמד לגבולות המסך; בלעדיה — במרכז
+    if (clientX != null) {
+      const pw = 340;
+      const ph = 260;
+      popup.style.left = `${Math.min(Math.max(8, clientX - pw / 2), innerWidth - pw - 8)}px`;
+      popup.style.top = `${Math.min(Math.max(8, clientY + 12), innerHeight - ph - 8)}px`;
+    } else {
+      popup.style.left = `${(innerWidth - 340) / 2}px`;
+      popup.style.top = '25vh';
+    }
+
+    const quick = $('quickNames');
+    quick.innerHTML = '';
+    const apply = (name) => {
+      room.name = name.trim();
+      this.viewer.refreshRoom(room);
+      this.closeRoomNamePopup();
+      this.reassignRooms();
+    };
+    for (const name of COMMON_ROOM_NAMES) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn';
+      b.textContent = name;
+      b.addEventListener('click', () => apply(name));
+      quick.appendChild(b);
+    }
+
+    const input = $('customRoomName');
+    input.value = room.name === 'חדר' ? '' : room.name;
+    const confirm = $('confirmRoomName');
+    const cancel = $('cancelRoomName');
+    confirm.onclick = () => { if (input.value.trim()) apply(input.value); };
+    input.onkeydown = (e) => { if (e.key === 'Enter' && input.value.trim()) apply(input.value); };
+    cancel.onclick = () => {
+      if (isNew) {
+        // ביטול על חדר חדש — מסירים אותו
+        this.rooms = this.rooms.filter((r) => r.id !== room.id);
+        this.viewer.rooms = this.rooms;
+        this.viewer.removeElement('room', room.id);
+      }
+      this.closeRoomNamePopup();
+    };
+    setTimeout(() => input.focus(), 50);
+  }
+
+  closeRoomNamePopup() {
+    $('roomNamePopup').classList.add('hidden');
   }
 
   reassignRooms() {
@@ -436,7 +522,7 @@ class App {
   }
 
   #setToolButtons(activeId) {
-    for (const id of ['modePan', 'modeAddOutlet', 'modeAddRoom']) {
+    for (const id of ['modePan', 'modeAddOutlet', 'modeAddRoom', 'modeNameRoom']) {
       $(id).classList.toggle('active', id === activeId);
     }
   }
@@ -477,6 +563,9 @@ class App {
     });
     $('modeAddRoom').addEventListener('click', () => {
       this.viewer.setMode('addRoom'); this.#setToolButtons('modeAddRoom');
+    });
+    $('modeNameRoom').addEventListener('click', () => {
+      this.viewer.setMode('nameRoom'); this.#setToolButtons('modeNameRoom');
     });
     $('zoomIn').addEventListener('click', () => this.viewer.zoomBy(1.25));
     $('zoomOut').addEventListener('click', () => this.viewer.zoomBy(1 / 1.25));

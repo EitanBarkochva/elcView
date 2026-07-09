@@ -59,6 +59,7 @@
           <button id="modePan" class="btn tool active" title="גרירת התצוגה">✋ תצוגה</button>
           <button id="modeAddOutlet" class="btn tool" title="לחיצה על השרטוט מוסיפה שקע">➕ שקע</button>
           <button id="modeAddRoom" class="btn tool" title="מתיחת מלבן מגדירה חדר">🏠 חדר</button>
+          <button id="modeNameRoom" class="btn tool" title="הקש על חדר בשרטוט וכתוב את שמו">✏️ שם חדר</button>
         </div>
         <div class="toolbar-group">
           <button id="zoomIn" class="btn">＋</button>
@@ -123,6 +124,17 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
+
+  <!-- חלונית בחירת שם חדר (נפתחת בהקשה על השרטוט במצב "שם חדר") -->
+  <div id="roomNamePopup" class="room-name-popup hidden">
+    <h4>מה שם החדר?</h4>
+    <div class="quick-names" id="quickNames"></div>
+    <div class="name-input-row">
+      <input type="text" id="customRoomName" placeholder="או הקלד שם אחר...">
+      <button id="confirmRoomName" class="btn primary">אישור</button>
+      <button id="cancelRoomName" class="btn">ביטול</button>
+    </div>
+  </div>
 
   <script type="module" src="js/app.js"></script>
 </body>

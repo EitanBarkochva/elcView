@@ -308,6 +308,9 @@ export class PlanViewer {
       if (this.mode === 'addOutlet') {
         const p = this.#toPage(e.clientX, e.clientY);
         this.cb.onAddOutlet(p.x, p.y);
+      } else if (this.mode === 'nameRoom') {
+        const p = this.#toPage(e.clientX, e.clientY);
+        this.cb.onNameRoomAt(p.x, p.y, e.clientX, e.clientY);
       } else {
         this.select(null, null); // ביטול בחירה
       }
