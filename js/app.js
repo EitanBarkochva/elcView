@@ -6,6 +6,7 @@ import { PdfService } from './services/pdfService.js';
 import { PlanDetector } from './services/detector.js';
 import { OcrService } from './services/ocrService.js';
 import { SupabaseRepo } from './services/db.js';
+import { AiAnalyzer } from './services/aiService.js';
 import { ExcelExporter } from './services/excelExporter.js';
 import { PlanViewer } from './ui/planViewer.js';
 import { TableView } from './ui/tableView.js';
@@ -16,6 +17,7 @@ const $ = (id) => document.getElementById(id);
 class App {
   constructor() {
     this.repo = new SupabaseRepo();
+    this.ai = new AiAnalyzer(this.repo.client);
     this.pdf = new PdfService();
     this.detector = new PlanDetector();
     this.ocr = new OcrService();
@@ -344,6 +346,96 @@ class App {
     }
   }
 
+  /**
+   * ניתוח AI: שולח את השרטוט ל-Claude ומקבל חדרים ונקודות מפוענחים.
+   * החדרים מוחלפים בתוצאת הניתוח; הנקודות ממוזגות — נקודה קיימת קרובה
+   * מתעדכנת (כמות, מרחק, מעגל), ונקודות חדשות נוספות.
+   */
+  async runAiAnalysis() {
+    const btn = $('runAi');
+    btn.disabled = true;
+    try {
+      this.setStatus('🤖 שולח את השרטוט לניתוח Claude... זה יכול לקחת דקה-שתיים');
+      const items = await this.pdf.extractTextItems();
+      const analysis = await this.ai.analyze($('planCanvas'), items, this.pdf.pageSize);
+      const summary = this.#applyAiAnalysis(analysis);
+      this.setStatus(
+        `🤖 Claude: ${summary.rooms} חדרים, עודכנו ${summary.updated} נקודות, ` +
+        `נוספו ${summary.added}. ${analysis.notes || ''}`,
+      );
+      this.toast('ניתוח Claude הושלם — בדוק את התוצאות על השרטוט');
+    } catch (e) {
+      this.setStatus('שגיאת ניתוח Claude: ' + e.message);
+      this.toast('שגיאת ניתוח Claude', true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  #applyAiAnalysis(analysis) {
+    // חדרים: תוצאת הניתוח מחליפה את ההצעות הקיימות
+    if (analysis.rooms?.length) {
+      this.rooms = analysis.rooms.map((r) => new Room({
+        project_id: this.project.id,
+        name: r.name,
+        bounds: {
+          x: Math.min(r.x0, r.x1),
+          y: Math.min(r.y0, r.y1),
+          w: Math.abs(r.x1 - r.x0),
+          h: Math.abs(r.y1 - r.y0),
+        },
+      }));
+    }
+
+    // נקודות: מיזוג לפי קרבה גיאומטרית
+    let updated = 0;
+    let added = 0;
+    const aiRoomOf = new Map(); // outlet.id ⇒ שם החדר לפי Claude
+    for (const ao of analysis.outlets ?? []) {
+      let outlet = null;
+      let best = 20; // רדיוס התאמה בנקודות עמוד
+      for (const o of this.outlets) {
+        const d = Math.hypot(o.x - ao.x, o.y - ao.y);
+        if (d < best) { best = d; outlet = o; }
+      }
+      if (outlet) {
+        outlet.kind = ao.kind || outlet.kind;
+        if (outlet.heightCm == null && ao.height_cm != null) outlet.heightCm = ao.height_cm;
+        if (ao.quantity >= 1) outlet.quantity = Math.min(4, ao.quantity);
+        if (ao.corner_distance_cm != null) outlet.cornerDistanceCm = ao.corner_distance_cm;
+        if (ao.circuit) outlet.circuit = ao.circuit;
+        updated++;
+      } else {
+        outlet = new Outlet({
+          project_id: this.project.id,
+          x: ao.x,
+          y: ao.y,
+          kind: ao.kind || 'שקע',
+          height_cm: ao.height_cm,
+          corner_distance_cm: ao.corner_distance_cm,
+          circuit: ao.circuit,
+          quantity: Math.min(4, Math.max(1, ao.quantity || 1)),
+        });
+        this.outlets.push(outlet);
+        added++;
+      }
+      if (ao.room) aiRoomOf.set(outlet.id, ao.room);
+    }
+
+    // שיוך לחדרים: קודם לפי הכלה גיאומטרית, ואז לפי השם ש-Claude נתן
+    this.reassignRooms();
+    for (const o of this.outlets) {
+      if (o.roomId) continue;
+      const name = aiRoomOf.get(o.id);
+      if (!name) continue;
+      const room = this.rooms.find((r) => r.name === name);
+      if (room) o.roomId = room.id;
+    }
+
+    this.viewer.setData(this.rooms, this.outlets);
+    return { rooms: this.rooms.length, updated, added };
+  }
+
   async confirmPlan() {
     if (!this.outlets.length) {
       this.toast('אין נקודות לשמירה — הוסף שקעים על השרטוט', true);
@@ -570,6 +662,7 @@ class App {
     $('zoomIn').addEventListener('click', () => this.viewer.zoomBy(1.25));
     $('zoomOut').addEventListener('click', () => this.viewer.zoomBy(1 / 1.25));
     $('zoomFit').addEventListener('click', () => this.viewer.fit());
+    $('runAi').addEventListener('click', () => this.runAiAnalysis());
     $('runOcr').addEventListener('click', () => this.runOcr());
     $('confirmPlan').addEventListener('click', () => this.confirmPlan());
 
