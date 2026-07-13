@@ -67,14 +67,18 @@ export class PdfService {
    */
   async extractTextItems() {
     const content = await this.page.getTextContent();
-    const pageHeight = this.pageSize.height;
+    // חשוב: טקסט התוכן חי במרחב ה-user של ה-PDF (ה-MediaBox, לפני סיבוב
+    // העמוד). בעמודים מסובבים (נפוץ בייצוא אוטוקאד) גובה ה-MediaBox שונה
+    // מגובה התצוגה — שימוש בגובה התצוגה מסיט את כל הנקודות אנכית.
+    const [vx0, vy0, , vy1] = this.page.view; // MediaBox: [x0, y0, x1, y1]
+    const userHeight = vy1 - vy0;
     const items = content.items
       .filter((it) => it.str && it.str.trim())
       .map((it) => ({
         text: it.str.trim(),
-        // transform[4],[5] = מיקום בקואורדינטות PDF (ראשית למטה-שמאל)
-        x: it.transform[4],
-        y: pageHeight - it.transform[5], // היפוך ציר Y לקואורדינטות מסך
+        // transform[4],[5] = מיקום במרחב ה-user (ראשית למטה-שמאל)
+        x: it.transform[4] - vx0,
+        y: userHeight - it.transform[5], // היפוך ציר Y לקואורדינטות מסך
         source: 'text',
       }));
 

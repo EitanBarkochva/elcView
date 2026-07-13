@@ -4,6 +4,7 @@ import { OUTLET_KINDS, DEFAULT_HEIGHT_CM, COMMON_ROOM_NAMES } from './config.js'
 import { Room, Outlet } from './models.js';
 import { PdfService } from './services/pdfService.js';
 import { PlanDetector } from './services/detector.js';
+import { SymbolDetector } from './services/symbolDetector.js';
 import { OcrService } from './services/ocrService.js';
 import { SupabaseRepo } from './services/db.js';
 import { AiAnalyzer } from './services/aiService.js';
@@ -20,6 +21,7 @@ class App {
     this.ai = new AiAnalyzer(this.repo.client);
     this.pdf = new PdfService();
     this.detector = new PlanDetector();
+    this.symbolDetector = new SymbolDetector();
     this.ocr = new OcrService();
     this.exporter = new ExcelExporter();
 
@@ -134,16 +136,20 @@ class App {
     const buf = await file.arrayBuffer();
     await this.#loadPlan(buf);
 
-    // זיהוי אוטומטי משכבת הטקסט ומההערות המוטמעות ב-PDF
-    this.setStatus('מזהה שקעים, חדרים ומרחקים...');
+    // זיהוי אוטומטי: טקסט/הערות מה-PDF + זיהוי גיאומטרי של הסמלים,
+    // וחיבור ביניהם לפי קרבה פיזית בדף
+    this.setStatus('מזהה שקעים, סמלים, חדרים ומרחקים...');
     const textItems = await this.pdf.extractTextItems();
     this.outlets = this.detector.detectOutlets(textItems, this.project.id);
+    const symbols = this.symbolDetector.detect($('planCanvas'), textItems);
+    const fusion = this.detector.fuseSymbols(this.outlets, symbols);
     this.rooms = this.detector.detectRoomsFromItems(textItems, this.project.id, this.pdf.pageSize);
     const dists = this.detector.suggestDistancesFromItems(textItems, this.outlets);
     this.reassignRooms();
     this.viewer.setData(this.rooms, this.outlets);
     this.setStatus(
-      `זוהו ${this.outlets.length} נקודות, ${this.rooms.length} חדרים, ${dists} מרחקים. ` +
+      `זוהו ${this.outlets.length} נקודות (${fusion.snapped} עוגנו לסמלים), ` +
+      `${this.rooms.length} חדרים, ${dists} מרחקים. ` +
       (this.rooms.length
         ? 'גרור ומתח את מלבני החדרים לגבולות האמיתיים.'
         : 'הרץ OCR לזיהוי חדרים או סמן ידנית.'),
@@ -164,9 +170,11 @@ class App {
       this.outlets = await this.repo.loadOutlets(project.id);
       const hasSavedData = this.outlets.length > 0;
       if (!hasSavedData) {
-        // פרויקט שטרם אושר — מריצים זיהוי מחדש מהטקסט ומההערות
+        // פרויקט שטרם אושר — מריצים זיהוי מחדש מהטקסט, ההערות והסמלים
         const textItems = await this.pdf.extractTextItems();
         this.outlets = this.detector.detectOutlets(textItems, project.id);
+        const symbols = this.symbolDetector.detect($('planCanvas'), textItems);
+        this.detector.fuseSymbols(this.outlets, symbols);
         if (!this.rooms.length) {
           this.rooms = this.detector.detectRoomsFromItems(textItems, project.id, this.pdf.pageSize);
         }

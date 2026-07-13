@@ -258,6 +258,68 @@ export class PlanDetector {
     return filled;
   }
 
+  /**
+   * חיבור הסמלים הגיאומטריים (עיגולים/משולשים מ-SymbolDetector) לנקודות
+   * שזוהו מהטקסט — לפי קרבה פיזית בדף:
+   * 1. סמלים צמודים מקובצים לאשכול (שקע כפול = שני עיגולים צמודים).
+   * 2. כל נקודה "נצמדת" לאשכול הקרוב אליה: המיקום מתעדכן למרכז האשכול
+   *    האמיתי (במקום מיקום התווית) והכמות נלקחת מגודל האשכול.
+   * @returns {{snapped:number, clusters:number}}
+   */
+  fuseSymbols(outlets, allSymbols, { snapDist = 30 } = {}) {
+    // מצמידים רק לעיגולים — משולשים בשרטוטים אלה הם לרוב חיצי קווי מידה
+    const symbols = allSymbols.filter((s) => s.shape === 'circle');
+    if (!symbols.length) return { snapped: 0, clusters: 0 };
+
+    // 1. אשכולות בקישור-יחיד: סמלים במרחק עד ~2 קטרים זה מזה
+    const clusters = [];
+    const used = new Array(symbols.length).fill(false);
+    for (let i = 0; i < symbols.length; i++) {
+      if (used[i]) continue;
+      const cluster = [symbols[i]];
+      used[i] = true;
+      for (let j = 0; j < cluster.length; j++) {
+        const a = cluster[j];
+        for (let k = 0; k < symbols.length; k++) {
+          if (used[k]) continue;
+          const b = symbols[k];
+          const gap = Math.hypot(a.x - b.x, a.y - b.y);
+          if (gap <= (a.r + b.r) * 2.2) {
+            cluster.push(b);
+            used[k] = true;
+          }
+        }
+      }
+      const cx = cluster.reduce((s, c) => s + c.x, 0) / cluster.length;
+      const cy = cluster.reduce((s, c) => s + c.y, 0) / cluster.length;
+      clusters.push({ x: cx, y: cy, size: cluster.length, symbols: cluster });
+    }
+
+    // 2. הצמדה חמדנית: הזוג (נקודה, אשכול) הקרוב ביותר משויך ראשון
+    const pairs = [];
+    for (const o of outlets) {
+      for (const c of clusters) {
+        const d = Math.hypot(o.x - c.x, o.y - c.y);
+        if (d <= snapDist) pairs.push({ o, c, d });
+      }
+    }
+    pairs.sort((a, b) => a.d - b.d);
+
+    const usedOutlets = new Set();
+    const usedClusters = new Set();
+    let snapped = 0;
+    for (const { o, c } of pairs) {
+      if (usedOutlets.has(o.id) || usedClusters.has(c)) continue;
+      usedOutlets.add(o.id);
+      usedClusters.add(c);
+      o.x = c.x;
+      o.y = c.y;
+      if (c.size > 1 && o.quantity === 1) o.quantity = Math.min(4, c.size);
+      snapped++;
+    }
+    return { snapped, clusters: clusters.length };
+  }
+
   /** משייך כל שקע לחדר שמכיל אותו גיאומטרית (או null) */
   assignOutletsToRooms(outlets, rooms) {
     const validIds = new Set(rooms.map((r) => r.id));
