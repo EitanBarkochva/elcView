@@ -260,7 +260,10 @@ export class PlanDetector {
 
   /** משייך כל שקע לחדר שמכיל אותו גיאומטרית (או null) */
   assignOutletsToRooms(outlets, rooms) {
+    const validIds = new Set(rooms.map((r) => r.id));
     for (const o of outlets) {
+      // ניקוי מזהה חדר "יתום" — חדר שהוחלף/נמחק (מונע הפרת FK בשמירה)
+      if (o.roomId && !validIds.has(o.roomId)) o.roomId = null;
       const room = rooms.find((r) => r.contains(o.x, o.y));
       if (room) o.roomId = room.id;
     }

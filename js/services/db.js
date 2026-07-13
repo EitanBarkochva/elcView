@@ -74,7 +74,14 @@ export class SupabaseRepo {
       if (res.error) throw res.error;
     }
     if (outlets.length) {
-      res = await this.client.from('outlets').insert(outlets.map((o) => o.toRow()));
+      // רשת ביטחון: מאפסים room_id שאינו מפנה לחדר קיים (מונע הפרת FK)
+      const validRoomIds = new Set(rooms.map((r) => r.id));
+      const rows = outlets.map((o) => {
+        const row = o.toRow();
+        if (row.room_id && !validRoomIds.has(row.room_id)) row.room_id = null;
+        return row;
+      });
+      res = await this.client.from('outlets').insert(rows);
       if (res.error) throw res.error;
     }
   }
