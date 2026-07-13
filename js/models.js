@@ -24,12 +24,16 @@ export class Project {
 }
 
 export class Room {
-  constructor({ id = uuid(), project_id = null, name = 'חדר', bounds = null } = {}) {
+  constructor({
+    id = uuid(), project_id = null, name = 'חדר', bounds = null, entrance = null,
+  } = {}) {
     this.id = id;
     this.projectId = project_id;
     this.name = name;
     // bounds: {x, y, w, h} בקואורדינטות PDF, או null אם לא הוגדר מלבן
     this.bounds = bounds;
+    // entrance: {x, y} — נקודת הפתח של החלל, ממנה מתחיל המספור
+    this.entrance = entrance;
   }
 
   contains(x, y) {
@@ -38,7 +42,10 @@ export class Room {
   }
 
   toRow() {
-    return { id: this.id, project_id: this.projectId, name: this.name, bounds: this.bounds };
+    return {
+      id: this.id, project_id: this.projectId, name: this.name,
+      bounds: this.bounds, entrance: this.entrance,
+    };
   }
 
   static fromRow(row) {
@@ -50,7 +57,7 @@ export class Outlet {
   constructor({
     id = uuid(), project_id = null, room_id = null, kind = 'שקע',
     height_cm = null, corner_distance_cm = null, x = 0, y = 0,
-    circuit = null, done = false, notes = '', quantity = 1,
+    circuit = null, done = false, notes = '', quantity = 1, label = null,
     measured_height_cm = null, measured_corner_cm = null, measure_status = null,
   } = {}) {
     this.id = id;
@@ -65,6 +72,7 @@ export class Outlet {
     this.done = done;
     this.notes = notes;
     this.quantity = quantity; // 1=בודד, 2=כפול, 4=רביעייה
+    this.label = label; // מזהה המוצר: "מטבח-3" (שם חלל + מספר רץ מהפתח)
     // תוצאות מדידה מהביקורת בשטח (שלבים ב'-ד')
     this.measuredHeightCm = measured_height_cm;
     this.measuredCornerCm = measured_corner_cm;
@@ -85,6 +93,7 @@ export class Outlet {
       done: this.done,
       notes: this.notes,
       quantity: this.quantity,
+      label: this.label,
       measured_height_cm: this.measuredHeightCm,
       measured_corner_cm: this.measuredCornerCm,
       measure_status: this.measureStatus,

@@ -144,6 +144,17 @@ export class PlanViewer {
     resize.className = 'room-resize';
     el.append(name, resize);
 
+    // סמן הפתח — נקודת תחילת המספור של החלל
+    if (room.entrance && room.bounds) {
+      const door = document.createElement('span');
+      door.className = 'room-entrance';
+      door.title = 'פתח החלל — תחילת המספור';
+      door.textContent = '🚪';
+      door.style.left = `${(room.entrance.x - room.bounds.x) * RENDER_SCALE}px`;
+      door.style.top = `${(room.entrance.y - room.bounds.y) * RENDER_SCALE}px`;
+      el.appendChild(door);
+    }
+
     this.#styleRoom(el, room);
 
     // בחירה בלחיצה על המסגרת, גרירה מהתגית, שינוי גודל מהידית
@@ -311,6 +322,9 @@ export class PlanViewer {
       } else if (this.mode === 'nameRoom') {
         const p = this.#toPage(e.clientX, e.clientY);
         this.cb.onNameRoomAt(p.x, p.y, e.clientX, e.clientY);
+      } else if (this.mode === 'setEntrance') {
+        const p = this.#toPage(e.clientX, e.clientY);
+        this.cb.onSetEntrance(p.x, p.y);
       } else {
         this.select(null, null); // ביטול בחירה
       }

@@ -6,7 +6,7 @@
 // שמות חדרים ומספרי מידות מצוירים לרוב כקווים (פונט SHX) — בהם מטפל ה-OCR.
 
 import { Outlet, Room } from '../models.js';
-import { ROOM_LEXICON } from '../config.js';
+import { ROOM_LEXICON, PRODUCT_LEXICON, LABEL_SEPARATOR } from '../config.js';
 
 const HEIGHT_RE = /^H\s*=\s*(\d{1,3})$/i;
 const KIND_LABELS = { TV: 'TV', T: 'תקשורת', 'ת': 'תקשורת' };
@@ -92,7 +92,76 @@ export class PlanDetector {
         outlets.push(outlet);
       }
     }
+
+    // מוצרי חשמל מהמקרא (דוד, מזגן, מקרר...) — תוויות בשרטוט שנמצאות
+    // במילון המוצרים הופכות לנקודה עם שם המוצר כסוג
+    for (const item of items) {
+      if (item.source === 'text') continue; // שמות מוצרים חיים בהערות
+      const decoded = decodeShxHebrew(item.text).trim();
+      if (decoded.length > 16) continue;
+      const product = PRODUCT_LEXICON.find((p) => decoded.includes(p));
+      if (!product) continue;
+      const dup = outlets.some(
+        (o) => o.kind === product && Math.hypot(o.x - item.x, o.y - item.y) < 15,
+      );
+      if (dup) continue;
+      outlets.push(new Outlet({
+        project_id: projectId, kind: product, x: item.x, y: item.y,
+      }));
+    }
     return outlets;
+  }
+
+  /**
+   * מזהה לכל מוצר: שם החלל + מפריד + מספר רץ בסדר עולה מהפתח של
+   * החלל ועד סופו. הסדר נקבע לפי הליכה על היקף מלבן החדר בכיוון
+   * השעון, החל מנקודת הפתח (room.entrance) — או מהפינה השמאלית-עליונה
+   * אם לא סומן פתח. נקודות בלי חדר לא מקבלות מזהה.
+   */
+  numberOutlets(outlets, rooms) {
+    for (const room of rooms) {
+      const roomOutlets = outlets.filter((o) => o.roomId === room.id);
+      if (!roomOutlets.length || !room.bounds) continue;
+
+      const start = room.entrance
+        ? this.#perimeterPos(room.bounds, room.entrance.x, room.entrance.y)
+        : 0;
+      const perimeter = 2 * (room.bounds.w + room.bounds.h);
+
+      roomOutlets
+        .map((o) => ({
+          o,
+          pos: (this.#perimeterPos(room.bounds, o.x, o.y) - start + perimeter) % perimeter,
+        }))
+        .sort((a, b) => a.pos - b.pos)
+        .forEach((entry, i) => {
+          entry.o.label = `${room.name}${LABEL_SEPARATOR}${i + 1}`;
+        });
+    }
+    // נקודות ללא חדר — בלי מזהה
+    for (const o of outlets) {
+      if (!o.roomId) o.label = null;
+    }
+  }
+
+  /**
+   * מיקום נקודה על היקף המלבן: מטילים אותה לנקודה הקרובה ביותר על
+   * ההיקף ומחזירים את אורך הקשת בכיוון השעון מהפינה השמאלית-עליונה.
+   */
+  #perimeterPos(b, px, py) {
+    // הצמדה לגבולות המלבן
+    const cx = Math.min(Math.max(px, b.x), b.x + b.w);
+    const cy = Math.min(Math.max(py, b.y), b.y + b.h);
+    // המרחק לכל אחת מארבע הצלעות
+    const dTop = Math.abs(cy - b.y);
+    const dRight = Math.abs(cx - (b.x + b.w));
+    const dBottom = Math.abs(cy - (b.y + b.h));
+    const dLeft = Math.abs(cx - b.x);
+    const m = Math.min(dTop, dRight, dBottom, dLeft);
+    if (m === dTop) return cx - b.x;                                // צלע עליונה: שמאל⇐ימין
+    if (m === dRight) return b.w + (cy - b.y);                      // ימנית: למעלה⇐למטה
+    if (m === dBottom) return b.w + b.h + (b.x + b.w - cx);         // תחתונה: ימין⇐שמאל
+    return 2 * b.w + b.h + (b.y + b.h - cy);                        // שמאלית: למטה⇐למעלה
   }
 
   /**

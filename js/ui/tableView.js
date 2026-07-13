@@ -39,6 +39,7 @@ export class TableView {
     table.innerHTML = `
       <thead><tr>
         <th>חדר</th>
+        <th>מזהה</th>
         <th>כמות שקעים</th>
         <th>גובה מהרצפה (ס"מ)</th>
         <th>מרחק מקיר סמוך (ס"מ)</th>
@@ -49,7 +50,15 @@ export class TableView {
     const tbody = document.createElement('tbody');
 
     for (const [name, group] of sortedGroups) {
-      group.sort((a, b) => (a.heightCm ?? 0) - (b.heightCm ?? 0));
+      // מיון לפי המספר הרץ במזהה (סדר ההליכה מהפתח); בלי מזהה — לפי גובה
+      const labelNum = (o) => {
+        const m = o.label?.match(/(\d+)\s*$/);
+        return m ? parseInt(m[1], 10) : Infinity;
+      };
+      group.sort((a, b) => {
+        const d = labelNum(a) - labelNum(b);
+        return d !== 0 ? d : (a.heightCm ?? 0) - (b.heightCm ?? 0);
+      });
       const totalSockets = group.reduce((s, o) => s + (o.quantity || 1), 0);
 
       group.forEach((o, idx) => {
@@ -87,6 +96,7 @@ export class TableView {
 
     // עמודות קריאה בלבד
     for (const val of [
+      outlet.label ?? '—',
       qtyText,
       outlet.heightCm ?? '—',
       outlet.cornerDistanceCm ?? '—',

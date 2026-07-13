@@ -43,6 +43,7 @@ class App {
         onAddOutlet: (x, y) => this.addOutlet(x, y),
         onAddRoom: (bounds) => this.addRoom(bounds),
         onNameRoomAt: (x, y, clientX, clientY) => this.nameRoomAt(x, y, clientX, clientY),
+        onSetEntrance: (x, y) => this.setRoomEntrance(x, y),
         onGeometryChanged: () => this.reassignRooms(),
       },
     );
@@ -313,6 +314,22 @@ class App {
     this.detector.assignOutletsToRooms(this.outlets, this.rooms);
   }
 
+  /**
+   * סימון פתח החלל: אחרי לחיצה על "סמן פתח" בעורך החדר, ההקשה הבאה
+   * על השרטוט קובעת מאיפה מתחיל המספור של המוצרים בחלל.
+   */
+  setRoomEntrance(x, y) {
+    const room = this._entranceRoom;
+    this._entranceRoom = null;
+    this.viewer.setMode('pan');
+    this.#setToolButtons('modePan');
+    if (!room) return;
+    room.entrance = { x, y };
+    this.detector.numberOutlets(this.outlets, this.rooms);
+    this.viewer.renderAll();
+    this.setStatus(`סומן פתח לחלל "${room.name}" — המספור עודכן.`);
+  }
+
   async runOcr() {
     const btn = $('runOcr');
     btn.disabled = true;
@@ -451,6 +468,8 @@ class App {
     }
     try {
       this.reassignRooms();
+      // מזהה לכל מוצר: שם חלל + מספר רץ מהפתח (מטבח-1, מטבח-2...)
+      this.detector.numberOutlets(this.outlets, this.rooms);
       this.setStatus('שומר...');
       await this.repo.saveDetection(this.project.id, this.rooms, this.outlets);
       this.setStatus('נשמר ✓');
@@ -471,7 +490,10 @@ class App {
     panel.innerHTML = '<h3>עריכת נקודה</h3>';
 
     const kindSel = this.#labeled(panel, 'סוג נקודה', 'select');
-    for (const k of OUTLET_KINDS) {
+    const kinds = OUTLET_KINDS.includes(outlet.kind)
+      ? OUTLET_KINDS
+      : [outlet.kind, ...OUTLET_KINDS]; // מוצרים מהמקרא (דוד, מזגן...)
+    for (const k of kinds) {
       kindSel.add(new Option(k, k, false, k === outlet.kind));
     }
     kindSel.addEventListener('change', () => {
@@ -551,6 +573,17 @@ class App {
     if (!room) { panel.classList.add('hidden'); return; }
     panel.classList.remove('hidden');
     panel.innerHTML = '<h3>עריכת חדר</h3>';
+
+    const doorBtn = document.createElement('button');
+    doorBtn.className = 'btn';
+    doorBtn.style.marginBottom = '8px';
+    doorBtn.textContent = room.entrance ? '🚪 הזז את הפתח' : '🚪 סמן פתח (תחילת המספור)';
+    doorBtn.addEventListener('click', () => {
+      this._entranceRoom = room;
+      this.viewer.setMode('setEntrance');
+      this.setStatus(`הקש על השרטוט במיקום הפתח של "${room.name}"`);
+    });
+    panel.appendChild(doorBtn);
 
     const name = this.#labeled(panel, 'שם החדר', 'input');
     name.setAttribute('list', 'roomNamesList');

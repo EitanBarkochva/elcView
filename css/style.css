@@ -170,6 +170,13 @@ main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   padding: 1px 8px; font-size: 12px; border-radius: 0 4px 0 6px;
   cursor: move; user-select: none;
 }
+.room-rect .room-entrance {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+  pointer-events: none;
+}
 .room-rect .room-resize {
   position: absolute; bottom: -7px; left: -7px;
   width: 14px; height: 14px; border-radius: 50%;

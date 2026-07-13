@@ -10,7 +10,11 @@ export class ExcelExporter {
     const XLSX = window.XLSX;
     const roomName = (id) => rooms.find((r) => r.id === id)?.name || 'ללא חדר';
 
-    // מיון לפי חדר (״ללא חדר״ בסוף) ואז לפי גובה
+    // מיון לפי חדר (״ללא חדר״ בסוף) ואז לפי המספר הרץ במזהה
+    const labelNum = (o) => {
+      const m = o.label?.match(/(\d+)\s*$/);
+      return m ? parseInt(m[1], 10) : Infinity;
+    };
     const sorted = [...outlets].sort((a, b) => {
       const an = roomName(a.roomId);
       const bn = roomName(b.roomId);
@@ -19,11 +23,13 @@ export class ExcelExporter {
         if (bn === 'ללא חדר') return -1;
         return an.localeCompare(bn, 'he');
       }
-      return (a.heightCm ?? 0) - (b.heightCm ?? 0);
+      const d = labelNum(a) - labelNum(b);
+      return d !== 0 ? d : (a.heightCm ?? 0) - (b.heightCm ?? 0);
     });
 
     const rows = sorted.map((o) => ({
       'חדר': roomName(o.roomId),
+      'מזהה': o.label ?? '',
       'כמות שקעים': o.quantity ?? 1,
       'סוג נקודה': o.kind,
       'גובה מהרצפה (ס"מ)': o.heightCm ?? '',
@@ -38,8 +44,8 @@ export class ExcelExporter {
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 14 }, { wch: 11 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 8 },
-      { wch: 14 }, { wch: 14 }, { wch: 11 }, { wch: 7 }, { wch: 40 },
+      { wch: 14 }, { wch: 12 }, { wch: 11 }, { wch: 10 }, { wch: 16 }, { wch: 18 },
+      { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 11 }, { wch: 7 }, { wch: 40 },
     ];
 
     const wb = XLSX.utils.book_new();
