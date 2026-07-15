@@ -17,8 +17,10 @@ export class TableView {
   /**
    * @param {Room[]} rooms
    * @param {Outlet[]} outlets
+   * @param {boolean} readOnly תצוגת לקוח — בלי עריכה כלל
    */
-  render(rooms, outlets) {
+  render(rooms, outlets, readOnly = false) {
+    this.readOnly = readOnly;
     const roomName = (id) => rooms.find((r) => r.id === id)?.name || 'ללא חדר';
 
     // קיבוץ לפי חדר, בסדר עברי, "ללא חדר" בסוף
@@ -113,6 +115,7 @@ export class TableView {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = outlet.done;
+    cb.disabled = this.readOnly;
     cb.addEventListener('change', () => {
       outlet.done = cb.checked;
       tr.classList.toggle('done-row', outlet.done);
@@ -126,7 +129,8 @@ export class TableView {
     const input = document.createElement('input');
     input.type = 'text';
     input.value = outlet.notes || '';
-    input.placeholder = 'הערה...';
+    input.placeholder = this.readOnly ? '' : 'הערה...';
+    input.readOnly = this.readOnly;
     let timer = null;
     input.addEventListener('input', () => {
       outlet.notes = input.value;

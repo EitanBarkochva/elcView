@@ -7,11 +7,16 @@ function uuid() {
 }
 
 export class Project {
-  constructor({ id = uuid(), name = '', pdf_path = null, created_at = null } = {}) {
+  constructor({
+    id = uuid(), name = '', pdf_path = null, created_at = null,
+    approved_at = null, approved_by = null,
+  } = {}) {
     this.id = id;
     this.name = name;
     this.pdfPath = pdf_path;
     this.createdAt = created_at ? new Date(created_at) : new Date();
+    this.approvedAt = approved_at ? new Date(approved_at) : null;
+    this.approvedBy = approved_by;
   }
 
   toRow() {

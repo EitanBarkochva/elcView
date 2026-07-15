@@ -10,6 +10,15 @@ export const RENDER_SCALE = 2;
 // סוגי נקודות חשמל
 export const OUTLET_KINDS = ['שקע', 'TV', 'תקשורת', 'אחר'];
 
+// שמות התפקידים בעברית
+export const ROLE_NAMES = {
+  admin: 'מנהל מערכת',
+  contractor: 'קבלן חשמל',
+  electrician: 'חשמלאי',
+  architect: 'אדריכל',
+  client: 'לקוח',
+};
+
 // המפריד בין שם החלל למספר הרץ במזהה המוצר: "מטבח-3"
 export const LABEL_SEPARATOR = '-';
 

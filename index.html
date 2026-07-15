@@ -14,19 +14,38 @@
 <body>
   <header class="app-header">
     <h1>⚡ elcView</h1>
-    <nav class="tabs" id="mainTabs">
+    <nav class="tabs hidden" id="mainTabs">
       <button class="tab active" data-screen="projects">פרויקטים</button>
       <button class="tab" data-screen="plan" disabled>שרטוט</button>
       <button class="tab" data-screen="table" disabled>טבלה</button>
       <button class="tab" data-screen="inspection" disabled>ביקורת</button>
     </nav>
     <span id="projectTitle" class="project-title"></span>
+    <span id="userArea" class="user-area hidden">
+      <span id="userInfo"></span>
+      <button id="logoutBtn" class="btn small">יציאה</button>
+    </span>
   </header>
 
   <main>
+    <!-- ============ מסך כניסה ============ -->
+    <section id="screen-login" class="screen">
+      <div class="panel login-panel">
+        <h2>כניסה למערכת</h2>
+        <form id="loginForm" class="new-project-form">
+          <input type="email" id="loginEmail" placeholder="אימייל" required autocomplete="username">
+          <input type="password" id="loginPassword" placeholder="סיסמה" required autocomplete="current-password">
+          <input type="text" id="signupName" class="hidden" placeholder="שם מלא">
+          <button type="submit" class="btn primary" id="loginSubmit">כניסה</button>
+          <button type="button" class="btn" id="toggleSignup">אין לי חשבון — הרשמה</button>
+          <p class="muted small">נרשמים חדשים מקבלים הרשאת לקוח; מנהל המערכת קובע תפקידים.</p>
+        </form>
+      </div>
+    </section>
+
     <!-- ============ מסך פרויקטים ============ -->
     <section id="screen-projects" class="screen active">
-      <div class="panel">
+      <div class="panel" id="newProjectPanel">
         <h2>פרויקט חדש</h2>
         <form id="newProjectForm" class="new-project-form">
           <input type="text" id="projectName" placeholder="שם הפרויקט (למשל: דירה 5)" required>
@@ -49,6 +68,10 @@
         <div id="projectList" class="project-list">
           <p class="muted">טוען...</p>
         </div>
+      </div>
+      <div class="panel hidden" id="usersPanel">
+        <h2>👥 ניהול משתמשים (מנהל מערכת)</h2>
+        <div id="usersList" class="project-list"></div>
       </div>
     </section>
 
@@ -91,9 +114,26 @@
       <div class="table-toolbar">
         <button id="exportExcel" class="btn primary">📥 הורד לאקסל</button>
         <button id="backToPlan" class="btn">חזרה לשרטוט</button>
+        <button id="approveProject" class="btn hidden">✔ אשר תוכנית</button>
+        <button id="newRequest" class="btn hidden">🔧 בקש שינוי</button>
+        <span id="approvedBadge" class="approved-badge hidden"></span>
         <span id="tableStats" class="muted"></span>
       </div>
       <div id="summaryTable" class="summary-table-wrap"></div>
+      <div class="table-extras">
+        <div class="panel" id="requestsPanel">
+          <h2>🔧 בקשות שינוי</h2>
+          <div id="requestList" class="request-list"><p class="muted">אין בקשות.</p></div>
+        </div>
+        <div class="panel" id="commentsPanel">
+          <h2>💬 הערות על הטבלה</h2>
+          <div id="commentList" class="comment-list"></div>
+          <div class="name-input-row">
+            <input type="text" id="newCommentText" placeholder="כתוב הערה...">
+            <button id="addCommentBtn" class="btn primary">שלח</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ============ מסך ביקורת (שלד לשלב ב') ============ -->
@@ -125,6 +165,30 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
+
+  <!-- חלונית בקשת שינוי של לקוח -->
+  <div id="requestPopup" class="room-name-popup hidden">
+    <h4>🔧 בקשת שינוי — הוספת אביזר חשמל</h4>
+    <label class="popup-label">לאיזה חדר?
+      <select id="reqRoom"></select>
+    </label>
+    <label class="popup-label">איזה אביזר?
+      <select id="reqKind"></select>
+    </label>
+    <label class="popup-label">גובה מהרצפה (ס"מ)
+      <input type="number" id="reqHeight" placeholder="למשל 25">
+    </label>
+    <label class="popup-label">מרחק מקיר סמוך (ס"מ)
+      <input type="number" id="reqDist" placeholder="למשל 60">
+    </label>
+    <label class="popup-label">הערה
+      <input type="text" id="reqNotes" placeholder="פרטים נוספים...">
+    </label>
+    <div class="name-input-row">
+      <button id="sendRequest" class="btn primary">שלח בקשה</button>
+      <button id="cancelRequest" class="btn">ביטול</button>
+    </div>
+  </div>
 
   <!-- חלונית בחירת שם חדר (נפתחת בהקשה על השרטוט במצב "שם חדר") -->
   <div id="roomNamePopup" class="room-name-popup hidden">

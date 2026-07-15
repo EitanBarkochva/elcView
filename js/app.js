@@ -1,6 +1,8 @@
 // ===== האפליקציה הראשית — חיווט מסכים, זרימה ומצב =====
 
-import { OUTLET_KINDS, DEFAULT_HEIGHT_CM, COMMON_ROOM_NAMES } from './config.js';
+import {
+  OUTLET_KINDS, DEFAULT_HEIGHT_CM, COMMON_ROOM_NAMES, ROLE_NAMES, PRODUCT_LEXICON,
+} from './config.js';
 import { Room, Outlet } from './models.js';
 import { PdfService } from './services/pdfService.js';
 import { PlanDetector } from './services/detector.js';
@@ -75,8 +77,95 @@ class App {
       },
     );
 
+    this.profile = null; // הפרופיל (כולל תפקיד) של המשתמש המחובר
     this.#bindUi();
+    this.#initAuth();
+  }
+
+  // ---------- אימות ותפקידים ----------
+
+  get isEditor() {
+    return ['admin', 'contractor', 'architect'].includes(this.profile?.role);
+  }
+
+  async #initAuth() {
+    try {
+      const session = await this.repo.getSession();
+      if (session) await this.#onLoggedIn();
+      else this.#showLogin();
+    } catch {
+      this.#showLogin();
+    }
+  }
+
+  #showLogin() {
+    this.profile = null;
+    $('mainTabs').classList.add('hidden');
+    $('userArea').classList.add('hidden');
+    this.showScreen('login');
+  }
+
+  async #onLoggedIn() {
+    this.profile = await this.repo.getMyProfile();
+    if (!this.profile) {
+      this.#showLogin();
+      return;
+    }
+    $('mainTabs').classList.remove('hidden');
+    $('userArea').classList.remove('hidden');
+    $('userInfo').textContent =
+      `${this.profile.name || this.profile.email} · ${ROLE_NAMES[this.profile.role] || this.profile.role}`;
+    this.#applyRoleUi();
+    this.showScreen('projects');
     this.refreshProjectList();
+    if (this.profile.role === 'admin') this.#renderUsersPanel();
+  }
+
+  /** התאמת הממשק לתפקיד המשתמש */
+  #applyRoleUi() {
+    const role = this.profile.role;
+    // שרטוט: עורכים בלבד; ביקורת: כולם חוץ מלקוח
+    document.querySelector('[data-screen="plan"]').classList.toggle('hidden', !this.isEditor);
+    document.querySelector('[data-screen="inspection"]').classList.toggle('hidden', role === 'client');
+    // יצירת פרויקטים: עורכים בלבד
+    $('newProjectPanel').classList.toggle('hidden', !this.isEditor);
+    $('usersPanel').classList.toggle('hidden', role !== 'admin');
+    // כפתורי טבלה
+    $('approveProject').classList.toggle('hidden', !this.isEditor);
+    $('newRequest').classList.toggle('hidden', !(role === 'client' || role === 'admin'));
+    $('backToPlan').classList.toggle('hidden', !this.isEditor);
+  }
+
+  /** פאנל ניהול משתמשים — מנהל מערכת בלבד */
+  async #renderUsersPanel() {
+    const wrap = $('usersList');
+    try {
+      const profiles = await this.repo.listProfiles();
+      wrap.innerHTML = '';
+      for (const p of profiles) {
+        const row = document.createElement('div');
+        row.className = 'project-row';
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = p.name ? `${p.name} (${p.email})` : p.email;
+        const roleSel = document.createElement('select');
+        for (const [value, label] of Object.entries(ROLE_NAMES)) {
+          roleSel.add(new Option(label, value, false, p.role === value));
+        }
+        roleSel.addEventListener('change', async () => {
+          try {
+            await this.repo.setRole(p.id, roleSel.value);
+            this.toast(`התפקיד של ${p.email} עודכן ל${ROLE_NAMES[roleSel.value]}`);
+          } catch (e) {
+            this.toast('שגיאה בעדכון תפקיד: ' + e.message, true);
+          }
+        });
+        row.append(name, roleSel);
+        wrap.appendChild(row);
+      }
+    } catch (e) {
+      wrap.innerHTML = `<p class="muted">שגיאה: ${e.message}</p>`;
+    }
   }
 
   // ---------- ניווט ----------
@@ -89,7 +178,12 @@ class App {
     });
     if (name !== 'inspection') this.inspectionView.stopCamera();
     if (name === 'plan') requestAnimationFrame(() => this.viewer.fit());
-    if (name === 'table') this.renderTable();
+    if (name === 'table') {
+      this.renderTable();
+      this.refreshRequests();
+      this.refreshComments();
+      this.#updateApprovedBadge();
+    }
     if (name === 'inspection') this.inspectionView.setData(this.rooms, this.outlets);
   }
 
@@ -185,8 +279,9 @@ class App {
       this.viewer.setData(this.rooms, this.outlets);
       this.setStatus(`${this.rooms.length} חדרים, ${this.outlets.length} נקודות`);
       this.#enableProjectTabs();
-      // אם כבר יש נתונים שמורים — ישר לטבלה; אחרת למסך הזיהוי
-      this.showScreen(hasSavedData ? 'table' : 'plan');
+      // אם כבר יש נתונים שמורים — ישר לטבלה; אחרת למסך הזיהוי.
+      // מי שאינו עורך תמיד מגיע לטבלה (מסך השרטוט נסתר עבורו).
+      this.showScreen(hasSavedData || !this.isEditor ? 'table' : 'plan');
     } catch (e) {
       this.toast('שגיאה בפתיחת הפרויקט: ' + e.message, true);
     }
@@ -630,8 +725,164 @@ class App {
   // ---------- טבלה ----------
 
   renderTable() {
-    this.tableView.render(this.rooms, this.outlets);
+    // לקוח רואה את הטבלה לקריאה בלבד
+    this.tableView.render(this.rooms, this.outlets, this.profile?.role === 'client');
     this.updateTableStats();
+  }
+
+  #updateApprovedBadge() {
+    const badge = $('approvedBadge');
+    if (this.project?.approvedAt) {
+      badge.textContent =
+        `✔ התוכנית אושרה ע"י ${this.project.approvedBy} · ${this.project.approvedAt.toLocaleDateString('he-IL')}`;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  // ---------- בקשות שינוי ----------
+
+  async refreshRequests() {
+    if (!this.project) return;
+    const wrap = $('requestList');
+    try {
+      const requests = await this.repo.listRequests(this.project.id);
+      wrap.innerHTML = requests.length ? '' : '<p class="muted">אין בקשות.</p>';
+      const statusText = {
+        pending: 'ממתין לתמחור הקבלן',
+        priced: 'ממתין לאישור הלקוח',
+        approved: 'אושר ונוסף לטבלה',
+        rejected: 'נדחה',
+      };
+      for (const r of requests) {
+        const div = document.createElement('div');
+        div.className = 'request-item';
+        div.innerHTML =
+          `<b>${r.kind}</b> בחדר <b>${r.room_name}</b>` +
+          (r.height_cm != null ? ` · גובה ${r.height_cm} ס"מ` : '') +
+          (r.corner_distance_cm != null ? ` · מרחק ${r.corner_distance_cm} ס"מ` : '') +
+          (r.notes ? ` · ${r.notes}` : '') +
+          `<br><span class="req-status ${r.status}">${statusText[r.status]}</span>` +
+          (r.price != null ? ` · מחיר: <b>${r.price} ₪</b>` : '') +
+          ` <span class="muted small">(${r.created_by_email || ''})</span>`;
+
+        const actions = document.createElement('div');
+        actions.className = 'req-actions';
+
+        // קבלן/אדריכל/מנהל: תמחור בקשה ממתינה, דחייה
+        if (this.isEditor && r.status === 'pending') {
+          const priceInput = document.createElement('input');
+          priceInput.type = 'number';
+          priceInput.placeholder = 'מחיר ₪';
+          const priceBtn = document.createElement('button');
+          priceBtn.className = 'btn primary';
+          priceBtn.textContent = 'תמחר';
+          priceBtn.addEventListener('click', async () => {
+            const price = parseFloat(priceInput.value);
+            if (!(price >= 0)) return this.toast('הזן מחיר', true);
+            await this.#safeRequestUpdate(r.id, { price, status: 'priced' });
+          });
+          actions.append(priceInput, priceBtn);
+        }
+        if (this.isEditor && ['pending', 'priced'].includes(r.status)) {
+          const rejectBtn = document.createElement('button');
+          rejectBtn.className = 'btn danger';
+          rejectBtn.textContent = 'דחה';
+          rejectBtn.addEventListener('click', () =>
+            this.#safeRequestUpdate(r.id, { status: 'rejected' }));
+          actions.appendChild(rejectBtn);
+        }
+        // הלקוח שיצר: אישור/דחייה של המחיר
+        if (r.created_by === this.profile.id && r.status === 'priced') {
+          const okBtn = document.createElement('button');
+          okBtn.className = 'btn primary';
+          okBtn.textContent = `✔ מאשר את המחיר (${r.price} ₪)`;
+          okBtn.addEventListener('click', () =>
+            this.#safeRequestUpdate(r.id, { status: 'approved' }, true));
+          const noBtn = document.createElement('button');
+          noBtn.className = 'btn';
+          noBtn.textContent = 'לא מאשר';
+          noBtn.addEventListener('click', () =>
+            this.#safeRequestUpdate(r.id, { status: 'rejected' }));
+          actions.append(okBtn, noBtn);
+        }
+
+        if (actions.children.length) div.appendChild(actions);
+        wrap.appendChild(div);
+      }
+    } catch (e) {
+      wrap.innerHTML = `<p class="muted">שגיאה: ${e.message}</p>`;
+    }
+  }
+
+  async #safeRequestUpdate(id, patch, reloadOutlets = false) {
+    try {
+      await this.repo.updateRequest(id, patch);
+      if (reloadOutlets) {
+        // הבקשה אושרה — האביזר נוסף לטבלה בצד השרת; טוענים מחדש
+        this.outlets = await this.repo.loadOutlets(this.project.id);
+        this.viewer.setData(this.rooms, this.outlets);
+        this.renderTable();
+        this.toast('הבקשה אושרה — האביזר נוסף לטבלה');
+      }
+      this.refreshRequests();
+    } catch (e) {
+      this.toast('שגיאה: ' + e.message, true);
+    }
+  }
+
+  #openRequestPopup() {
+    const popup = $('requestPopup');
+    popup.classList.remove('hidden');
+    popup.style.left = `${Math.max(8, (innerWidth - 340) / 2)}px`;
+    popup.style.top = '15vh';
+    const roomSel = $('reqRoom');
+    roomSel.innerHTML = '';
+    const names = [...new Set(this.rooms.map((r) => r.name))];
+    for (const n of names) roomSel.add(new Option(n, n));
+    const kindSel = $('reqKind');
+    kindSel.innerHTML = '';
+    for (const k of [...OUTLET_KINDS, ...PRODUCT_LEXICON]) kindSel.add(new Option(k, k));
+  }
+
+  async #sendRequest() {
+    try {
+      await this.repo.createRequest({
+        project_id: this.project.id,
+        room_name: $('reqRoom').value,
+        kind: $('reqKind').value,
+        height_cm: $('reqHeight').value ? parseInt($('reqHeight').value, 10) : null,
+        corner_distance_cm: $('reqDist').value ? parseInt($('reqDist').value, 10) : null,
+        notes: $('reqNotes').value || '',
+        created_by: this.profile.id,
+        created_by_email: this.profile.email,
+      });
+      $('requestPopup').classList.add('hidden');
+      this.toast('הבקשה נשלחה לקבלן לתמחור');
+      this.refreshRequests();
+    } catch (e) {
+      this.toast('שגיאה בשליחת הבקשה: ' + e.message, true);
+    }
+  }
+
+  // ---------- הערות ----------
+
+  async refreshComments() {
+    if (!this.project) return;
+    const wrap = $('commentList');
+    try {
+      const comments = await this.repo.listComments(this.project.id);
+      wrap.innerHTML = comments.length ? '' : '<p class="muted">אין הערות.</p>';
+      for (const c of comments) {
+        const div = document.createElement('div');
+        div.className = 'comment-item';
+        div.innerHTML = `${c.text}<br><span class="muted small">${c.author_email || ''} · ${new Date(c.created_at).toLocaleString('he-IL')}</span>`;
+        wrap.appendChild(div);
+      }
+    } catch (e) {
+      wrap.innerHTML = `<p class="muted">שגיאה: ${e.message}</p>`;
+    }
   }
 
   updateTableStats() {
@@ -663,6 +914,62 @@ class App {
   // ---------- חיווט ----------
 
   #bindUi() {
+    // כניסה / הרשמה / יציאה
+    this._signupMode = false;
+    $('toggleSignup').addEventListener('click', () => {
+      this._signupMode = !this._signupMode;
+      $('signupName').classList.toggle('hidden', !this._signupMode);
+      $('loginSubmit').textContent = this._signupMode ? 'הרשמה וכניסה' : 'כניסה';
+      $('toggleSignup').textContent = this._signupMode
+        ? 'יש לי חשבון — כניסה' : 'אין לי חשבון — הרשמה';
+    });
+    $('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = $('loginEmail').value.trim();
+      const password = $('loginPassword').value;
+      try {
+        if (this._signupMode) {
+          await this.repo.signUp(email, password, $('signupName').value.trim());
+        } else {
+          await this.repo.signIn(email, password);
+        }
+        await this.#onLoggedIn();
+      } catch (err) {
+        this.toast('שגיאת כניסה: ' + err.message, true);
+      }
+    });
+    $('logoutBtn').addEventListener('click', async () => {
+      await this.repo.signOut();
+      location.reload();
+    });
+
+    // אישור תוכנית ובקשות שינוי
+    $('approveProject').addEventListener('click', async () => {
+      try {
+        await this.repo.approveProject(this.project.id, this.profile.email);
+        this.project.approvedAt = new Date();
+        this.project.approvedBy = this.profile.email;
+        this.#updateApprovedBadge();
+        this.toast('התוכנית אושרה');
+      } catch (e) {
+        this.toast('שגיאה באישור: ' + e.message, true);
+      }
+    });
+    $('newRequest').addEventListener('click', () => this.#openRequestPopup());
+    $('sendRequest').addEventListener('click', () => this.#sendRequest());
+    $('cancelRequest').addEventListener('click', () => $('requestPopup').classList.add('hidden'));
+    $('addCommentBtn').addEventListener('click', async () => {
+      const text = $('newCommentText').value.trim();
+      if (!text) return;
+      try {
+        await this.repo.addComment(this.project.id, text, this.profile.email);
+        $('newCommentText').value = '';
+        this.refreshComments();
+      } catch (e) {
+        this.toast('שגיאה בשליחת ההערה: ' + e.message, true);
+      }
+    });
+
     // טאבים
     $('mainTabs').addEventListener('click', (e) => {
       const btn = e.target.closest('.tab');
