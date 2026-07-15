@@ -18,6 +18,7 @@
       <button class="tab active" data-screen="projects">פרויקטים</button>
       <button class="tab" data-screen="plan" disabled>שרטוט</button>
       <button class="tab" data-screen="table" disabled>טבלה</button>
+      <button class="tab" data-screen="schematic" disabled>שרטוט חשמלי</button>
       <button class="tab" data-screen="inspection" disabled>ביקורת</button>
     </nav>
     <span id="projectTitle" class="project-title"></span>
@@ -133,6 +134,17 @@
             <button id="addCommentBtn" class="btn primary">שלח</button>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ============ מסך שרטוט חשמלי ============ -->
+    <section id="screen-schematic" class="screen">
+      <div class="table-toolbar">
+        <button id="downloadSchematic" class="btn primary">📷 הורד כתמונה</button>
+        <span class="muted">הבית עם אביזרי החשמל והמספור בלבד; המקרא בתחתית התמונה.</span>
+      </div>
+      <div id="schematicWrap" class="schematic-wrap">
+        <p class="muted">טוען...</p>
       </div>
     </section>
 

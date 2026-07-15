@@ -13,6 +13,7 @@ import { AiAnalyzer } from './services/aiService.js';
 import { ExcelExporter } from './services/excelExporter.js';
 import { PlanViewer } from './ui/planViewer.js';
 import { TableView } from './ui/tableView.js';
+import { SchematicView } from './ui/schematicView.js';
 import { InspectionView } from './ui/inspectionView.js';
 
 const $ = (id) => document.getElementById(id);
@@ -24,6 +25,7 @@ class App {
     this.pdf = new PdfService();
     this.detector = new PlanDetector();
     this.symbolDetector = new SymbolDetector();
+    this.schematicView = new SchematicView();
     this.ocr = new OcrService();
     this.exporter = new ExcelExporter();
 
@@ -184,6 +186,7 @@ class App {
       this.refreshComments();
       this.#updateApprovedBadge();
     }
+    if (name === 'schematic') this.renderSchematic();
     if (name === 'inspection') this.inspectionView.setData(this.rooms, this.outlets);
   }
 
@@ -730,6 +733,37 @@ class App {
     this.updateTableStats();
   }
 
+  /** בניית השרטוט החשמלי הנקי: בית + אביזרים ממוספרים + מקרא */
+  async renderSchematic() {
+    const wrap = $('schematicWrap');
+    if (!this.project || !$('planCanvas').width) {
+      wrap.innerHTML = '<p class="muted">אין שרטוט טעון.</p>';
+      return;
+    }
+    // מוודאים שלכל אביזר יש מזהה (חלל-מספר)
+    if (this.outlets.some((o) => o.roomId && !o.label)) {
+      this.detector.numberOutlets(this.outlets, this.rooms);
+    }
+    wrap.innerHTML = '<p class="muted">בונה שרטוט חשמלי...</p>';
+    let textItems = [];
+    try { textItems = await this.pdf.extractTextItems(); } catch { /* בלי מחיקת טקסט */ }
+    const canvas = this.schematicView.build($('planCanvas'), this.rooms, this.outlets, textItems);
+    wrap.innerHTML = '';
+    wrap.appendChild(canvas);
+    this._schematicCanvas = canvas;
+  }
+
+  #downloadSchematic() {
+    if (!this._schematicCanvas) return;
+    this._schematicCanvas.toBlob((blob) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${this.project?.name || 'elcView'} - שרטוט חשמלי.png`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }, 'image/png');
+  }
+
   #updateApprovedBadge() {
     const badge = $('approvedBadge');
     if (this.project?.approvedAt) {
@@ -956,6 +990,7 @@ class App {
       }
     });
     $('newRequest').addEventListener('click', () => this.#openRequestPopup());
+    $('downloadSchematic').addEventListener('click', () => this.#downloadSchematic());
     $('sendRequest').addEventListener('click', () => this.#sendRequest());
     $('cancelRequest').addEventListener('click', () => $('requestPopup').classList.add('hidden'));
     $('addCommentBtn').addEventListener('click', async () => {

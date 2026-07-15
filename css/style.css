@@ -224,6 +224,17 @@ table.summary input[type="text"]:focus { border-color: var(--primary); backgroun
 table.summary input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--ok); }
 tr.done-row td { background: #f0f8f1; }
 
+/* ----- מסך שרטוט חשמלי ----- */
+.schematic-wrap {
+  flex: 1; overflow: auto; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px;
+  text-align: center;
+}
+.schematic-wrap canvas {
+  max-width: 100%; height: auto;
+  border: 1px solid var(--border);
+}
+
 /* ----- מסך ביקורת ----- */
 .inspection-controls { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin-bottom: 12px; }
 .inspection-controls select { padding: 8px; border-radius: 8px; border: 1px solid var(--border); min-width: 160px; }
