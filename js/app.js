@@ -13,7 +13,7 @@ import { AiAnalyzer } from './services/aiService.js';
 import { ExcelExporter } from './services/excelExporter.js';
 import { PlanViewer } from './ui/planViewer.js';
 import { TableView } from './ui/tableView.js';
-import { SchematicView } from './ui/schematicView.js';
+import { SchematicView, kindColor } from './ui/schematicView.js';
 import { InspectionView } from './ui/inspectionView.js';
 
 const $ = (id) => document.getElementById(id);
@@ -26,6 +26,36 @@ class App {
     this.detector = new PlanDetector();
     this.symbolDetector = new SymbolDetector();
     this.schematicView = new SchematicView();
+
+    // מציג אינטראקטיבי שני לכרטיסיית "שרטוט חשמלי": רקע נקי, סיכות עם
+    // המזהה (מטבח-1) בצבע לפי סוג, בלי מלבני חדרים
+    this.schemViewer = new PlanViewer(
+      {
+        viewport: $('schemViewport'),
+        world: $('schemWorld'),
+        canvas: $('schemCanvas'),
+        overlay: $('schemOverlay'),
+      },
+      {
+        onSelectOutlet: () => {},
+        onSelectRoom: () => {},
+        onAddOutlet: (x, y) => this.#schemAddOutlet(x, y),
+        onAddRoom: () => {},
+        onNameRoomAt: () => {},
+        onSetEntrance: () => {},
+        onGeometryChanged: () => {
+          this.reassignRooms();
+          this.detector.numberOutlets(this.outlets, this.rooms);
+          this.schemViewer.renderAll();
+        },
+      },
+      {
+        pinText: (o) => o.label || o.kind,
+        pinColor: (o) => kindColor(o.kind),
+        showRooms: false,
+      },
+    );
+    this._paletteKind = null; // הרכיב שנבחר במקרא להוספה
     this.ocr = new OcrService();
     this.exporter = new ExcelExporter();
 
@@ -134,6 +164,7 @@ class App {
     $('usersPanel').classList.toggle('hidden', role !== 'admin');
     // כפתורי טבלה
     $('approveProject').classList.toggle('hidden', !this.isEditor);
+    $('saveSchematic').classList.toggle('hidden', !this.isEditor);
     $('newRequest').classList.toggle('hidden', !(role === 'client' || role === 'admin'));
     $('backToPlan').classList.toggle('hidden', !this.isEditor);
   }
@@ -559,7 +590,7 @@ class App {
     return { rooms: this.rooms.length, updated, added };
   }
 
-  async confirmPlan() {
+  async confirmPlan(goToTable = true) {
     if (!this.outlets.length) {
       this.toast('אין נקודות לשמירה — הוסף שקעים על השרטוט', true);
       return;
@@ -572,7 +603,8 @@ class App {
       await this.repo.saveDetection(this.project.id, this.rooms, this.outlets);
       this.setStatus('נשמר ✓');
       this.toast('הנתונים נשמרו');
-      this.showScreen('table');
+      if (goToTable) this.showScreen('table');
+      else this.schemViewer.renderAll();
     } catch (e) {
       this.toast('שגיאה בשמירה: ' + e.message, true);
       this.setStatus('');
@@ -733,29 +765,95 @@ class App {
     this.updateTableStats();
   }
 
-  /** בניית השרטוט החשמלי הנקי: בית + אביזרים ממוספרים + מקרא */
+  /** כרטיסיית שרטוט חשמלי: רקע נקי + סיכות אינטראקטיביות + מקרא-פלטה */
   async renderSchematic() {
-    const wrap = $('schematicWrap');
-    if (!this.project || !$('planCanvas').width) {
-      wrap.innerHTML = '<p class="muted">אין שרטוט טעון.</p>';
-      return;
-    }
+    if (!this.project || !$('planCanvas').width) return;
+    this.setStatus('');
     // מוודאים שלכל אביזר יש מזהה (חלל-מספר)
     if (this.outlets.some((o) => o.roomId && !o.label)) {
       this.detector.numberOutlets(this.outlets, this.rooms);
     }
-    wrap.innerHTML = '<p class="muted">בונה שרטוט חשמלי...</p>';
-    let textItems = [];
-    try { textItems = await this.pdf.extractTextItems(); } catch { /* בלי מחיקת טקסט */ }
-    const canvas = this.schematicView.build($('planCanvas'), this.rooms, this.outlets, textItems);
-    wrap.innerHTML = '';
-    wrap.appendChild(canvas);
-    this._schematicCanvas = canvas;
+    // הרקע הנקי נבנה פעם אחת לכל פרויקט (חילוץ הקירות כבד)
+    if (this._schemBgFor !== this.project.id) {
+      $('schemHint').textContent = 'בונה שרטוט נקי...';
+      let textItems = [];
+      try { textItems = await this.pdf.extractTextItems(); } catch { /* בלי מחיקה */ }
+      this._schemBg = this.schematicView.buildBackground($('planCanvas'), this.rooms, textItems);
+      this._schemBgFor = this.project.id;
+    }
+    const canvas = $('schemCanvas');
+    canvas.width = this._schemBg.width;
+    canvas.height = this._schemBg.height;
+    canvas.getContext('2d').drawImage(this._schemBg, 0, 0);
+    const overlay = $('schemOverlay');
+    overlay.style.width = `${canvas.width}px`;
+    overlay.style.height = `${canvas.height}px`;
+
+    this.schemViewer.readOnly = !this.isEditor;
+    this.schemViewer.setData(this.rooms, this.outlets);
+    requestAnimationFrame(() => this.schemViewer.fit());
+    this.#renderPalette();
+    $('schemHint').textContent = this.isEditor
+      ? 'בחר רכיב במקרא והקש על השרטוט להוספה; גרור סיכות לדיוק המיקום.'
+      : 'הבית עם אביזרי החשמל בלבד. המקרא מימין.';
   }
 
-  #downloadSchematic() {
-    if (!this._schematicCanvas) return;
-    this._schematicCanvas.toBlob((blob) => {
+  /** המקרא בצד ימין: כל סוגי הרכיבים + כמות; לעורכים — לחיצה בוחרת להוספה */
+  #renderPalette() {
+    const wrap = $('paletteItems');
+    wrap.innerHTML = '';
+    const counts = new Map();
+    for (const o of this.outlets) {
+      counts.set(o.kind, (counts.get(o.kind) || 0) + (o.quantity || 1));
+    }
+    const kinds = [...new Set([...OUTLET_KINDS, ...PRODUCT_LEXICON, ...counts.keys()])];
+    for (const kind of kinds) {
+      const item = document.createElement('div');
+      item.className = 'palette-item' + (this.isEditor ? ' clickable' : '');
+      if (this._paletteKind === kind) item.classList.add('active');
+      item.innerHTML =
+        `<span class="dot" style="background:${kindColor(kind)}"></span>` +
+        `<span>${kind}</span>` +
+        `<span class="count">${counts.get(kind) || ''}</span>`;
+      if (this.isEditor) {
+        item.addEventListener('click', () => {
+          this._paletteKind = this._paletteKind === kind ? null : kind;
+          this.schemViewer.setMode(this._paletteKind ? 'addOutlet' : 'pan');
+          this.#renderPalette();
+          $('schemHint').textContent = this._paletteKind
+            ? `הקש על השרטוט כדי להוסיף ${this._paletteKind} (לחיצה נוספת במקרא מבטלת)`
+            : 'בחר רכיב במקרא והקש על השרטוט להוספה.';
+        });
+      }
+      wrap.appendChild(item);
+    }
+  }
+
+  /** הוספת רכיב מהמקרא בהקשה על השרטוט הנקי (עורכים בלבד) */
+  #schemAddOutlet(x, y) {
+    if (!this.isEditor || !this._paletteKind) return;
+    const outlet = new Outlet({
+      project_id: this.project.id,
+      x, y,
+      kind: this._paletteKind,
+      height_cm: this._paletteKind === 'שקע' ? DEFAULT_HEIGHT_CM : null,
+    });
+    const room = this.rooms.find((r) => r.contains(x, y));
+    if (room) outlet.roomId = room.id;
+    this.outlets.push(outlet);
+    this.detector.numberOutlets(this.outlets, this.rooms);
+    this.schemViewer.setData(this.rooms, this.outlets);
+    this.viewer.setData(this.rooms, this.outlets);
+    this.#renderPalette();
+    this.toast(`נוסף ${this._paletteKind}${outlet.label ? ` (${outlet.label})` : ''} — זכור לשמור`);
+  }
+
+  /** הורדת התמונה הסטטית המלאה (בית + אביזרים + מקרא בתחתית) */
+  async #downloadSchematic() {
+    let textItems = [];
+    try { textItems = await this.pdf.extractTextItems(); } catch { /* בלי מחיקה */ }
+    const full = this.schematicView.build($('planCanvas'), this.rooms, this.outlets, textItems);
+    full.toBlob((blob) => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `${this.project?.name || 'elcView'} - שרטוט חשמלי.png`;
@@ -991,6 +1089,7 @@ class App {
     });
     $('newRequest').addEventListener('click', () => this.#openRequestPopup());
     $('downloadSchematic').addEventListener('click', () => this.#downloadSchematic());
+    $('saveSchematic').addEventListener('click', () => this.confirmPlan(false));
     $('sendRequest').addEventListener('click', () => this.#sendRequest());
     $('cancelRequest').addEventListener('click', () => $('requestPopup').classList.add('hidden'));
     $('addCommentBtn').addEventListener('click', async () => {

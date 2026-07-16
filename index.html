@@ -137,14 +137,24 @@
       </div>
     </section>
 
-    <!-- ============ מסך שרטוט חשמלי ============ -->
+    <!-- ============ מסך שרטוט חשמלי (אינטראקטיבי) ============ -->
     <section id="screen-schematic" class="screen">
       <div class="table-toolbar">
-        <button id="downloadSchematic" class="btn primary">📷 הורד כתמונה</button>
-        <span class="muted">הבית עם אביזרי החשמל והמספור בלבד; המקרא בתחתית התמונה.</span>
+        <button id="downloadSchematic" class="btn">📷 הורד כתמונה</button>
+        <button id="saveSchematic" class="btn primary hidden">💾 שמור שינויים</button>
+        <span id="schemHint" class="muted">הבית עם אביזרי החשמל בלבד. המקרא מימין.</span>
       </div>
-      <div id="schematicWrap" class="schematic-wrap">
-        <p class="muted">טוען...</p>
+      <div class="plan-body">
+        <div id="schemViewport" class="plan-viewport">
+          <div id="schemWorld" class="plan-world">
+            <canvas id="schemCanvas"></canvas>
+            <div id="schemOverlay" class="plan-overlay"></div>
+          </div>
+        </div>
+        <aside id="schemPalette" class="palette-panel">
+          <h3>מקרא</h3>
+          <div id="paletteItems"></div>
+        </aside>
       </div>
     </section>
 

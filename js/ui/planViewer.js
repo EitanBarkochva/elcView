@@ -17,9 +17,15 @@ export class PlanViewer {
    *   onAddOutlet(x,y), onAddRoom(bounds), onGeometryChanged()
    * }
    */
-  constructor(els, callbacks) {
+  constructor(els, callbacks, opts = {}) {
     this.els = els;
     this.cb = callbacks;
+    // טקסט הסיכה: ברירת מחדל H=גובה; בשרטוט החשמלי — המזהה (מטבח-1)
+    this.pinText = opts.pinText
+      || ((o) => (o.heightCm != null ? `H=${o.heightCm}` : o.kind));
+    this.pinColor = opts.pinColor || null; // צבע מותאם לפי סוג (שרטוט חשמלי)
+    this.showRooms = opts.showRooms !== false;
+    this.readOnly = false; // לצופים: בחירה בלבד, בלי גרירה/הוספה
 
     this.scale = 1;
     this.tx = 0;
@@ -53,7 +59,9 @@ export class PlanViewer {
     this.els.overlay.innerHTML = '';
     this.pinEls.clear();
     this.roomEls.clear();
-    for (const room of this.rooms) this.#renderRoom(room);
+    if (this.showRooms) {
+      for (const room of this.rooms) this.#renderRoom(room);
+    }
     for (const outlet of this.outlets) this.#renderPin(outlet);
     this.#applySelection();
   }
@@ -124,8 +132,9 @@ export class PlanViewer {
     if (this.selected?.type === 'outlet' && this.selected.id === outlet.id) {
       el.classList.add('selected');
     }
-    const base = outlet.heightCm != null ? `H=${outlet.heightCm}` : outlet.kind;
+    const base = this.pinText(outlet);
     el.textContent = outlet.quantity > 1 ? `${base} ×${outlet.quantity}` : base;
+    if (this.pinColor) el.style.background = this.pinColor(outlet);
     const px = outlet.x * RENDER_SCALE;
     const py = outlet.y * RENDER_SCALE;
     el.style.left = `${px}px`;
@@ -333,6 +342,10 @@ export class PlanViewer {
 
   #onPinPointerDown(e, outlet, el) {
     e.stopPropagation();
+    if (this.readOnly) {
+      this.select('outlet', outlet.id);
+      return;
+    }
     el.setPointerCapture(e.pointerId);
     const startPage = this.#toPage(e.clientX, e.clientY);
     const orig = { x: outlet.x, y: outlet.y };
@@ -366,6 +379,10 @@ export class PlanViewer {
 
   #onRoomDrag(e, room, el, kind) {
     e.stopPropagation();
+    if (this.readOnly) {
+      this.select('room', room.id);
+      return;
+    }
     const target = e.currentTarget;
     target.setPointerCapture(e.pointerId);
     const startPage = this.#toPage(e.clientX, e.clientY);

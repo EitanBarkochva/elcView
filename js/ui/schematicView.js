@@ -12,13 +12,18 @@ const WALL_MIN_THICK = 8;   // עובי מינימלי (אחרי איחוי) —
 const MIN_WALL_COVERAGE = 0.003; // מתחת לזה עוברים לכל הקווים הארוכים
 
 // צבע לכל סוג אביזר
-const KIND_COLORS = {
+export const KIND_COLORS = {
   'שקע': '#1565c0',
   'TV': '#6a1b9a',
   'תקשורת': '#00838f',
   'אחר': '#546e7a',
 };
-const PRODUCT_COLOR = '#e65100'; // מוצרי חשמל מהמקרא (דוד, מזגן...)
+export const PRODUCT_COLOR = '#e65100'; // מוצרי חשמל מהמקרא (דוד, מזגן...)
+
+/** הצבע של סוג אביזר (למקרא ולסיכות) */
+export function kindColor(kind) {
+  return KIND_COLORS[kind] || PRODUCT_COLOR;
+}
 
 export class SchematicView {
   /**
@@ -50,11 +55,27 @@ export class SchematicView {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, out.width, out.height);
 
-    this.#drawWalls(ctx, planCanvas, textItems);
-    this.#drawRoomNames(ctx, rooms);
+    const bg = this.buildBackground(planCanvas, rooms, textItems);
+    ctx.drawImage(bg, 0, 0);
     this.#drawFixtures(ctx, items);
     this.#drawTitle(ctx, W);
     this.#drawLegend(ctx, kinds, 0, H, W, legendH);
+    return out;
+  }
+
+  /**
+   * הרקע הנקי בלבד: קירות (הפתחים נשמרים כרווחים) + שמות חדרים —
+   * משמש גם כתשתית לעורך האינטראקטיבי בכרטיסיית "שרטוט חשמלי".
+   */
+  buildBackground(planCanvas, rooms, textItems = []) {
+    const out = document.createElement('canvas');
+    out.width = planCanvas.width;
+    out.height = planCanvas.height;
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, out.width, out.height);
+    this.#drawWalls(ctx, planCanvas, textItems);
+    this.#drawRoomNames(ctx, rooms);
     return out;
   }
 

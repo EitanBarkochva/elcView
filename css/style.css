@@ -225,14 +225,31 @@ table.summary input[type="checkbox"] { width: 18px; height: 18px; accent-color: 
 tr.done-row td { background: #f0f8f1; }
 
 /* ----- מסך שרטוט חשמלי ----- */
-.schematic-wrap {
-  flex: 1; overflow: auto; background: var(--panel);
-  border: 1px solid var(--border); border-radius: 10px; padding: 8px;
-  text-align: center;
-}
-.schematic-wrap canvas {
-  max-width: 100%; height: auto;
+.palette-panel {
+  width: 210px;
+  background: var(--panel);
   border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  overflow-y: auto;
+}
+.palette-panel h3 { margin: 0 0 10px; font-size: 1rem; }
+.palette-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+  margin-bottom: 6px; font-size: .92rem; background: #fff;
+}
+.palette-item.clickable { cursor: pointer; }
+.palette-item.clickable:hover { background: #eef3f8; }
+.palette-item.active { outline: 2px solid var(--accent); background: #fff8e1; }
+.palette-item .dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border);
+  flex-shrink: 0;
+}
+.palette-item .count { margin-inline-start: auto; color: var(--muted); font-size: .85rem; }
+@media (max-width: 700px) {
+  .palette-panel { width: 100%; max-height: 30vh; }
 }
 
 /* ----- מסך ביקורת ----- */
