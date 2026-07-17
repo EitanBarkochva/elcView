@@ -98,6 +98,11 @@ export class PlanViewer {
     if (this.selected?.id === id) this.select(null, null);
   }
 
+  /** המרה ציבורית: קואורדינטות מסך ⇒ נקודות עמוד (לגרירה-ושחרור) */
+  clientToPage(clientX, clientY) {
+    return this.#toPage(clientX, clientY);
+  }
+
   fit() {
     const vw = this.els.viewport.clientWidth;
     const vh = this.els.viewport.clientHeight;

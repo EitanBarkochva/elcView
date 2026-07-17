@@ -37,7 +37,7 @@ class App {
         overlay: $('schemOverlay'),
       },
       {
-        onSelectOutlet: () => {},
+        onSelectOutlet: (o) => this.#schemSelect(o),
         onSelectRoom: () => {},
         onAddOutlet: (x, y) => this.#schemAddOutlet(x, y),
         onAddRoom: () => {},
@@ -822,21 +822,27 @@ class App {
           this.#renderPalette();
           $('schemHint').textContent = this._paletteKind
             ? `הקש על השרטוט כדי להוסיף ${this._paletteKind} (לחיצה נוספת במקרא מבטלת)`
-            : 'בחר רכיב במקרא והקש על השרטוט להוספה.';
+            : 'גרור רכיב מהמקרא אל השרטוט, או בחר רכיב והקש.';
+        });
+        // גרירה-ושחרור: גוררים את הרכיב מהמקרא ישירות אל השרטוט
+        item.draggable = true;
+        item.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', kind);
+          e.dataTransfer.effectAllowed = 'copy';
         });
       }
       wrap.appendChild(item);
     }
   }
 
-  /** הוספת רכיב מהמקרא בהקשה על השרטוט הנקי (עורכים בלבד) */
-  #schemAddOutlet(x, y) {
-    if (!this.isEditor || !this._paletteKind) return;
+  /** הוספת רכיב מהמקרא — בהקשה (רכיב נבחר) או בגרירה-ושחרור (kind מפורש) */
+  #schemAddOutlet(x, y, kind = this._paletteKind) {
+    if (!this.isEditor || !kind) return;
     const outlet = new Outlet({
       project_id: this.project.id,
       x, y,
-      kind: this._paletteKind,
-      height_cm: this._paletteKind === 'שקע' ? DEFAULT_HEIGHT_CM : null,
+      kind,
+      height_cm: kind === 'שקע' ? DEFAULT_HEIGHT_CM : null,
     });
     const room = this.rooms.find((r) => r.contains(x, y));
     if (room) outlet.roomId = room.id;
@@ -845,7 +851,31 @@ class App {
     this.schemViewer.setData(this.rooms, this.outlets);
     this.viewer.setData(this.rooms, this.outlets);
     this.#renderPalette();
-    this.toast(`נוסף ${this._paletteKind}${outlet.label ? ` (${outlet.label})` : ''} — זכור לשמור`);
+    this.toast(`נוסף ${kind}${outlet.label ? ` (${outlet.label})` : ''} — זכור לשמור`);
+  }
+
+  /** בחירת אביזר בשרטוט הנקי — מציגה כפתור מחיקה לעורכים */
+  #schemSelect(outlet) {
+    this._schemSelected = outlet;
+    const btn = $('deleteSchemOutlet');
+    if (outlet && this.isEditor) {
+      btn.textContent = `🗑 מחק ${outlet.label || outlet.kind}`;
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  }
+
+  #schemDeleteSelected() {
+    const outlet = this._schemSelected;
+    if (!outlet || !this.isEditor) return;
+    this.outlets = this.outlets.filter((o) => o.id !== outlet.id);
+    this.detector.numberOutlets(this.outlets, this.rooms);
+    this.schemViewer.setData(this.rooms, this.outlets);
+    this.viewer.setData(this.rooms, this.outlets);
+    this.#schemSelect(null);
+    this.#renderPalette();
+    this.toast(`${outlet.label || outlet.kind} נמחק — זכור לשמור`);
   }
 
   /** הורדת התמונה הסטטית המלאה (בית + אביזרים + מקרא בתחתית) */
@@ -1090,6 +1120,20 @@ class App {
     $('newRequest').addEventListener('click', () => this.#openRequestPopup());
     $('downloadSchematic').addEventListener('click', () => this.#downloadSchematic());
     $('saveSchematic').addEventListener('click', () => this.confirmPlan(false));
+    $('deleteSchemOutlet').addEventListener('click', () => this.#schemDeleteSelected());
+
+    // קבלת רכיב שנגרר מהמקרא אל השרטוט הנקי
+    const schemVp = $('schemViewport');
+    schemVp.addEventListener('dragover', (e) => {
+      if (this.isEditor) e.preventDefault();
+    });
+    schemVp.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const kind = e.dataTransfer.getData('text/plain');
+      if (!kind || !this.isEditor) return;
+      const p = this.schemViewer.clientToPage(e.clientX, e.clientY);
+      this.#schemAddOutlet(p.x, p.y, kind);
+    });
     $('sendRequest').addEventListener('click', () => this.#sendRequest());
     $('cancelRequest').addEventListener('click', () => $('requestPopup').classList.add('hidden'));
     $('addCommentBtn').addEventListener('click', async () => {
