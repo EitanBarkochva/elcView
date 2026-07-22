@@ -56,6 +56,36 @@ class App {
       },
     );
     this._paletteKind = null; // הרכיב שנבחר במקרא להוספה
+
+    // מציג שלישי לכרטיסיית "עריכה": רקע = העתק מדויק 1:1 של ה-PDF
+    // (בלי עיבוד), אלמנטים חשמליים בולטים, עריכה מלאה (גרירה/הוספה/מחיקה)
+    this.editViewer = new PlanViewer(
+      {
+        viewport: $('editViewport'),
+        world: $('editWorld'),
+        canvas: $('editCanvas'),
+        overlay: $('editOverlay'),
+      },
+      {
+        onSelectOutlet: (o) => this.#editSelect(o),
+        onSelectRoom: () => {},
+        onAddOutlet: (x, y) => this.#editAddOutlet(x, y),
+        onAddRoom: () => {},
+        onNameRoomAt: () => {},
+        onSetEntrance: () => {},
+        onGeometryChanged: () => {
+          this.reassignRooms();
+          this.detector.numberOutlets(this.outlets, this.rooms);
+          this.editViewer.renderAll();
+        },
+      },
+      {
+        pinText: (o) => o.label || o.kind,
+        pinColor: (o) => kindColor(o.kind),
+        showRooms: false,
+      },
+    );
+    this._editPaletteKind = null;
     this.ocr = new OcrService();
     this.exporter = new ExcelExporter();
 
@@ -158,6 +188,8 @@ class App {
     const role = this.profile.role;
     // שרטוט: עורכים בלבד; ביקורת: כולם חוץ מלקוח
     document.querySelector('[data-screen="plan"]').classList.toggle('hidden', !this.isEditor);
+    // עריכה: עורכים בלבד (מנהל/קבלן/אדריכל)
+    document.querySelector('[data-screen="edit"]').classList.toggle('hidden', !this.isEditor);
     document.querySelector('[data-screen="inspection"]').classList.toggle('hidden', role === 'client');
     // יצירת פרויקטים: עורכים בלבד
     $('newProjectPanel').classList.toggle('hidden', !this.isEditor);
@@ -218,6 +250,7 @@ class App {
       this.#updateApprovedBadge();
     }
     if (name === 'schematic') this.renderSchematic();
+    if (name === 'edit') this.renderEdit();
     if (name === 'inspection') this.inspectionView.setData(this.rooms, this.outlets);
   }
 
@@ -603,8 +636,13 @@ class App {
       await this.repo.saveDetection(this.project.id, this.rooms, this.outlets);
       this.setStatus('נשמר ✓');
       this.toast('הנתונים נשמרו');
-      if (goToTable) this.showScreen('table');
-      else this.schemViewer.renderAll();
+      if (goToTable) {
+        this.showScreen('table');
+      } else {
+        // שמירה מתוך שרטוט חשמלי / עריכה — נשארים במסך ומרעננים
+        this.schemViewer.renderAll();
+        this.editViewer.renderAll();
+      }
     } catch (e) {
       this.toast('שגיאה בשמירה: ' + e.message, true);
       this.setStatus('');
@@ -892,6 +930,103 @@ class App {
     }, 'image/png');
   }
 
+  /** כרטיסיית עריכה: העתק מדויק 1:1 של ה-PDF + אלמנטים חשמליים ניתנים לעריכה */
+  renderEdit() {
+    if (!this.project || !$('planCanvas').width) return;
+    if (this.outlets.some((o) => o.roomId && !o.label)) {
+      this.detector.numberOutlets(this.outlets, this.rooms);
+    }
+    // הרקע = העתק מדויק של רינדור ה-PDF (בלי כל עיבוד — "אחד לאחד")
+    const src = $('planCanvas');
+    const canvas = $('editCanvas');
+    canvas.width = src.width;
+    canvas.height = src.height;
+    canvas.getContext('2d').drawImage(src, 0, 0);
+    const overlay = $('editOverlay');
+    overlay.style.width = `${canvas.width}px`;
+    overlay.style.height = `${canvas.height}px`;
+
+    this.editViewer.readOnly = !this.isEditor;
+    this.editViewer.setData(this.rooms, this.outlets);
+    requestAnimationFrame(() => this.editViewer.fit());
+    this.#renderEditPalette();
+    $('saveEdit').classList.toggle('hidden', !this.isEditor);
+    $('editHint').textContent = this.isEditor
+      ? 'העתק מדויק של השרטוט. גרור רכיב מהמקרא להוספה, גרור סיכה להזזה, בחר סיכה למחיקה.'
+      : 'העתק מדויק של השרטוט עם האלמנטים החשמליים (תצוגה בלבד).';
+  }
+
+  #renderEditPalette() {
+    const wrap = $('editPaletteItems');
+    wrap.innerHTML = '';
+    const counts = new Map();
+    for (const o of this.outlets) {
+      counts.set(o.kind, (counts.get(o.kind) || 0) + (o.quantity || 1));
+    }
+    const kinds = [...new Set([...OUTLET_KINDS, ...PRODUCT_LEXICON, ...counts.keys()])];
+    for (const kind of kinds) {
+      const item = document.createElement('div');
+      item.className = 'palette-item' + (this.isEditor ? ' clickable' : '');
+      if (this._editPaletteKind === kind) item.classList.add('active');
+      item.innerHTML =
+        `<span class="dot" style="background:${kindColor(kind)}"></span>` +
+        `<span>${kind}</span>` +
+        `<span class="count">${counts.get(kind) || ''}</span>`;
+      if (this.isEditor) {
+        item.addEventListener('click', () => {
+          this._editPaletteKind = this._editPaletteKind === kind ? null : kind;
+          this.editViewer.setMode(this._editPaletteKind ? 'addOutlet' : 'pan');
+          this.#renderEditPalette();
+        });
+        item.draggable = true;
+        item.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', kind);
+          e.dataTransfer.effectAllowed = 'copy';
+        });
+      }
+      wrap.appendChild(item);
+    }
+  }
+
+  #editAddOutlet(x, y, kind = this._editPaletteKind) {
+    if (!this.isEditor || !kind) return;
+    const outlet = new Outlet({
+      project_id: this.project.id, x, y, kind,
+      height_cm: kind === 'שקע' ? DEFAULT_HEIGHT_CM : null,
+    });
+    const room = this.rooms.find((r) => r.contains(x, y));
+    if (room) outlet.roomId = room.id;
+    this.outlets.push(outlet);
+    this.detector.numberOutlets(this.outlets, this.rooms);
+    this.editViewer.setData(this.rooms, this.outlets);
+    this.viewer.setData(this.rooms, this.outlets);
+    this.#renderEditPalette();
+    this.toast(`נוסף ${kind}${outlet.label ? ` (${outlet.label})` : ''} — זכור לשמור`);
+  }
+
+  #editSelect(outlet) {
+    this._editSelected = outlet;
+    const btn = $('deleteEditOutlet');
+    if (outlet && this.isEditor) {
+      btn.textContent = `🗑 מחק ${outlet.label || outlet.kind}`;
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  }
+
+  #editDeleteSelected() {
+    const outlet = this._editSelected;
+    if (!outlet || !this.isEditor) return;
+    this.outlets = this.outlets.filter((o) => o.id !== outlet.id);
+    this.detector.numberOutlets(this.outlets, this.rooms);
+    this.editViewer.setData(this.rooms, this.outlets);
+    this.viewer.setData(this.rooms, this.outlets);
+    this.#editSelect(null);
+    this.#renderEditPalette();
+    this.toast(`${outlet.label || outlet.kind} נמחק — זכור לשמור`);
+  }
+
   #updateApprovedBadge() {
     const badge = $('approvedBadge');
     if (this.project?.approvedAt) {
@@ -1133,6 +1268,21 @@ class App {
       if (!kind || !this.isEditor) return;
       const p = this.schemViewer.clientToPage(e.clientX, e.clientY);
       this.#schemAddOutlet(p.x, p.y, kind);
+    });
+
+    // כרטיסיית עריכה: שמירה, מחיקה וגרירה-ושחרור מהמקרא
+    $('saveEdit').addEventListener('click', () => this.confirmPlan(false));
+    $('deleteEditOutlet').addEventListener('click', () => this.#editDeleteSelected());
+    const editVp = $('editViewport');
+    editVp.addEventListener('dragover', (e) => {
+      if (this.isEditor) e.preventDefault();
+    });
+    editVp.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const kind = e.dataTransfer.getData('text/plain');
+      if (!kind || !this.isEditor) return;
+      const p = this.editViewer.clientToPage(e.clientX, e.clientY);
+      this.#editAddOutlet(p.x, p.y, kind);
     });
     $('sendRequest').addEventListener('click', () => this.#sendRequest());
     $('cancelRequest').addEventListener('click', () => $('requestPopup').classList.add('hidden'));

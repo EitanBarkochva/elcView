@@ -7,6 +7,13 @@
   <link rel="stylesheet" href="css/style.css">
   <!-- ספריות חיצוניות (UMD, ללא build) -->
   <script src="libs/pdf.min.js"></script>
+  <script>
+    // גיבוי: אם הקובץ המקומי לא נטען (למשל ניתוק חיבור), טוענים מ-CDN
+    if (typeof pdfjsLib === 'undefined') {
+      document.write(
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
+    }
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
@@ -19,6 +26,7 @@
       <button class="tab" data-screen="plan" disabled>שרטוט</button>
       <button class="tab" data-screen="table" disabled>טבלה</button>
       <button class="tab" data-screen="schematic" disabled>שרטוט חשמלי</button>
+      <button class="tab" data-screen="edit" disabled>עריכה</button>
       <button class="tab" data-screen="inspection" disabled>ביקורת</button>
     </nav>
     <span id="projectTitle" class="project-title"></span>
@@ -155,6 +163,29 @@
         <aside id="schemPalette" class="palette-panel">
           <h3>מקרא</h3>
           <div id="paletteItems"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ מסך עריכה: העתק 1:1 של ה-PDF + עריכת אלמנטים ============ -->
+    <section id="screen-edit" class="screen">
+      <div class="table-toolbar">
+        <button id="saveEdit" class="btn primary">💾 שמור שינויים</button>
+        <button id="deleteEditOutlet" class="btn danger hidden">🗑 מחק</button>
+        <span id="editHint" class="muted">
+          העתק מדויק של השרטוט. גרור רכיב מהמקרא להוספה, גרור סיכה להזזה, הקש על סיכה למחיקה.
+        </span>
+      </div>
+      <div class="plan-body">
+        <div id="editViewport" class="plan-viewport">
+          <div id="editWorld" class="plan-world">
+            <canvas id="editCanvas"></canvas>
+            <div id="editOverlay" class="plan-overlay"></div>
+          </div>
+        </div>
+        <aside class="palette-panel">
+          <h3>מקרא</h3>
+          <div id="editPaletteItems"></div>
         </aside>
       </div>
     </section>

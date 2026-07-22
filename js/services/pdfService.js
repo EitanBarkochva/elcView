@@ -4,7 +4,11 @@
 import { RENDER_SCALE } from '../config.js';
 
 const pdfjsLib = window.pdfjsLib;
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
+// אם ה-lib נטען מ-CDN (גיבוי), גם ה-worker צריך להגיע מאותו מקור
+const fromCdn = !!document.querySelector('script[src*="cdnjs.cloudflare.com/ajax/libs/pdf.js"]');
+pdfjsLib.GlobalWorkerOptions.workerSrc = fromCdn
+  ? 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
+  : 'libs/pdf.worker.min.js';
 
 export class PdfService {
   constructor() {
